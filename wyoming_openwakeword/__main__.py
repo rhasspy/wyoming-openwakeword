@@ -27,7 +27,15 @@ async def main() -> None:
         help="Name or path to wake word model (.tflite)",
     )
     parser.add_argument(
-        "--models-dir", default=_DIR / "models", help="Path to directory with models"
+        "--models-dir",
+        default=_DIR / "models",
+        help="Path to directory with built-in models",
+    )
+    parser.add_argument(
+        "--custom-model-dir",
+        action="append",
+        default=[],
+        help="Path to directory with custom wake word models",
     )
     parser.add_argument(
         "--preload-model",
@@ -74,6 +82,7 @@ async def main() -> None:
         output_dir=args.output_dir,
     )
 
+    # Resolve built-in models
     for model in args.model:
         model_path = Path(model)
         if not model_path.exists():
@@ -88,6 +97,13 @@ async def main() -> None:
                 ), f"Missing model: {model} (looked in: {models_dir.absolute()})"
 
         state.model_paths[model] = model_path
+
+    # Search for custom wake word models
+    for custom_model_dir in args.custom_model_dir:
+        custom_model_dir = Path(custom_model_dir)
+        for custom_model_file in custom_model_dir.glob("*.tflite"):
+            state.model_paths[custom_model_file.stem] = custom_model_file
+            _LOGGER.debug("Found custom model: %s", custom_model_file)
 
     wyoming_info = Info(
         wake=[
