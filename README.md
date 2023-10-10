@@ -13,12 +13,15 @@
 
 ``` sh
 docker run -it -p 10400:10400 rhasspy/wyoming-openwakeword \
-    --model 'ok_nabu' \
-    --model 'hey_jarvis' \
-    --model 'hey_rhasspy' \
-    --model 'hey_mycroft' \
-    --model 'alexa' \
     --preload-model 'ok_nabu'
+```
+
+### Custom Models
+
+```sh
+docker run -it -p 10400:10400 -v /path/to/custom/models:/custom rhasspy/wyoming-openwakeword \
+    --preload-model 'ok_nabu' \
+    --custom-model-dir /custom
 ```
 
 [Source](https://github.com/rhasspy/wyoming-addons/tree/master/openwakeword)
