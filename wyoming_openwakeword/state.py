@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from pathlib import Path
 from threading import Lock, Semaphore, Thread
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 from .const import ClientData
 
@@ -15,7 +15,11 @@ class WakeWordState:
 @dataclass
 class State:
     models_dir: Path
-    model_paths: Dict[str, Path] = field(default_factory=dict)
+    """Directory with built-in models."""
+
+    custom_model_dirs: List[Path] = field(default_factory=list)
+    """Directories with custom wake word models."""
+
     ww_threads: Dict[str, Thread] = field(default_factory=dict)
     ww_threads_lock: Lock = field(default_factory=Lock)
 

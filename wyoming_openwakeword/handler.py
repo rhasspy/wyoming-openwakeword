@@ -2,6 +2,7 @@
 import argparse
 import asyncio
 import logging
+import re
 import time
 import wave
 from pathlib import Path
@@ -11,7 +12,7 @@ from typing import List, Optional
 import numpy as np
 from wyoming.audio import AudioChunk, AudioChunkConverter, AudioStart, AudioStop
 from wyoming.event import Event
-from wyoming.info import Describe, Info
+from wyoming.info import Attribution, Describe, Info, WakeModel, WakeProgram
 from wyoming.server import AsyncEventHandler
 from wyoming.wake import Detect, NotDetected
 
@@ -20,6 +21,7 @@ from .openwakeword import ww_proc
 from .state import State, WakeWordState
 
 _LOGGER = logging.getLogger(__name__)
+_WAKE_WORD_WITH_VERSION = re.compile(r"^(.+)_(v[0-9.]+)$")
 
 
 class OpenWakeWordEventHandler(AsyncEventHandler):
@@ -27,7 +29,6 @@ class OpenWakeWordEventHandler(AsyncEventHandler):
 
     def __init__(
         self,
-        wyoming_info: Info,
         cli_args: argparse.Namespace,
         state: State,
         *args,
@@ -36,7 +37,6 @@ class OpenWakeWordEventHandler(AsyncEventHandler):
         super().__init__(*args, **kwargs)
 
         self.cli_args = cli_args
-        self.wyoming_info_event = wyoming_info.event()
         self.client_id = str(time.monotonic_ns())
         self.state = state
         self.data: Optional[ClientData] = None
@@ -50,7 +50,8 @@ class OpenWakeWordEventHandler(AsyncEventHandler):
 
     async def handle_event(self, event: Event) -> bool:
         if Describe.is_type(event.type):
-            await self.write_event(self.wyoming_info_event)
+            info = self._get_info()
+            await self.write_event(info.event())
             _LOGGER.debug("Sent info to client: %s", self.client_id)
             return True
 
@@ -68,7 +69,12 @@ class OpenWakeWordEventHandler(AsyncEventHandler):
         if Detect.is_type(event.type):
             detect = Detect.from_event(event)
             if detect.names:
-                _ensure_loaded(self.state, detect.names, self.cli_args)
+                ensure_loaded(
+                    self.state,
+                    detect.names,
+                    threshold=self.cli_args.threshold,
+                    trigger_level=self.cli_args.trigger_level,
+                )
         elif AudioStart.is_type(event.type):
             # Reset
             for ww_data in self.data.wake_words.values():
@@ -149,19 +155,67 @@ class OpenWakeWordEventHandler(AsyncEventHandler):
         with self.state.clients_lock:
             self.state.clients.pop(self.client_id, None)
 
+    def _get_info(self) -> Info:
+        return Info(
+            wake=[
+                WakeProgram(
+                    name="openwakeword",
+                    description="An open-source audio wake word (or phrase) detection framework with a focus on performance and simplicity.",
+                    attribution=Attribution(
+                        name="dscripka", url="https://github.com/dscripka/openWakeWord"
+                    ),
+                    installed=True,
+                    models=[
+                        WakeModel(
+                            name=model_path.stem,
+                            # hey_jarvis_v0.1 => hey jarvis
+                            description=_get_description(model_path.stem),
+                            attribution=Attribution(
+                                name="dscripka",
+                                url="https://github.com/dscripka/openWakeWord",
+                            ),
+                            installed=True,
+                            languages=[],
+                        )
+                        for model_path in _get_wake_word_files(self.state)
+                    ],
+                )
+            ],
+        )
 
-def _ensure_loaded(state: State, names: List[str], cli_args: argparse.Namespace):
+
+# -----------------------------------------------------------------------------
+
+
+def ensure_loaded(state: State, names: List[str], threshold: float, trigger_level: int):
+    """Ensure wake words are loaded by name."""
     with state.ww_threads_lock, state.clients_lock:
         for model_key in names:
+            norm_model_key = _normalize_key(model_key)
+
             ww_state = state.wake_words.get(model_key)
             if ww_state is not None:
                 # Already loaded
                 continue
 
-            if model_key not in state.model_paths:
-                _LOGGER.error("Unknown wake word model: %s", model_key)
-                continue
+            model_paths = _get_wake_word_files(state)
+            model_path: Optional[Path] = None
+            for maybe_model_path in model_paths:
+                if norm_model_key == _normalize_key(maybe_model_path.stem):
+                    # Exact match
+                    model_path = maybe_model_path
+                    break
 
+                if match := _WAKE_WORD_WITH_VERSION.match(maybe_model_path.stem):
+                    # Exclude version
+                    if norm_model_key == _normalize_key(match.group(1)):
+                        model_path = maybe_model_path
+                        break
+
+            if model_path is None:
+                raise ValueError(f"Wake word model not found: {model_key}")
+
+            # Start thread for model
             state.wake_words[model_key] = WakeWordState()
             state.ww_threads[model_key] = Thread(
                 target=ww_proc,
@@ -169,7 +223,7 @@ def _ensure_loaded(state: State, names: List[str], cli_args: argparse.Namespace)
                 args=(
                     state,
                     model_key,
-                    state.model_paths[model_key],
+                    model_path,
                     asyncio.get_running_loop(),
                 ),
             )
@@ -177,6 +231,39 @@ def _ensure_loaded(state: State, names: List[str], cli_args: argparse.Namespace)
 
             for client_data in state.clients.values():
                 client_data.wake_words[model_key] = WakeWordData(
-                    threshold=cli_args.threshold,
-                    trigger_level=cli_args.trigger_level,
+                    threshold=threshold,
+                    trigger_level=trigger_level,
                 )
+
+            _LOGGER.debug("Started thread for %s", model_key)
+
+
+# -----------------------------------------------------------------------------
+
+
+def _get_wake_word_files(state: State) -> List[Path]:
+    """Get paths to all available wake word model files."""
+    model_paths = [
+        p
+        for p in state.models_dir.glob("*.tflite")
+        if _WAKE_WORD_WITH_VERSION.match(p.stem)
+    ]
+
+    for custom_model_dir in state.custom_model_dirs:
+        model_paths.extend(custom_model_dir.glob("*.tflite"))
+
+    return model_paths
+
+
+def _normalize_key(model_key: str) -> str:
+    """Normalize model key for comparison."""
+    return model_key.lower().replace("_", " ").strip()
+
+
+def _get_description(file_name: str) -> str:
+    """Get human-readable description of a wake word from model name."""
+    if match := _WAKE_WORD_WITH_VERSION.match(file_name):
+        # Remove version
+        file_name = match.group(1)
+
+    return file_name.replace("_", " ")

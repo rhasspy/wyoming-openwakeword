@@ -6,12 +6,11 @@ from functools import partial
 from pathlib import Path
 from threading import Thread
 
-from wyoming.info import Attribution, Info, WakeModel, WakeProgram
 from wyoming.server import AsyncServer
 
-from .handler import OpenWakeWordEventHandler
-from .openwakeword import embeddings_proc, mels_proc, ww_proc
-from .state import State, WakeWordState
+from .handler import OpenWakeWordEventHandler, ensure_loaded
+from .openwakeword import embeddings_proc, mels_proc
+from .state import State
 
 _LOGGER = logging.getLogger()
 _DIR = Path(__file__).parent
@@ -20,12 +19,6 @@ _DIR = Path(__file__).parent
 async def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--uri", default="stdio://", help="unix:// or tcp://")
-    parser.add_argument(
-        "--model",
-        required=True,
-        action="append",
-        help="Name or path to wake word model (.tflite)",
-    )
     parser.add_argument(
         "--models-dir",
         default=_DIR / "models",
@@ -64,6 +57,9 @@ async def main() -> None:
         action="store_true",
         help="Log all wake word probabilities (VERY noisy)",
     )
+    #
+    parser.add_argument("--model", action="append", default=[], help="Deprecated")
+
     args = parser.parse_args()
     logging.basicConfig(level=logging.DEBUG if args.debug else logging.INFO)
     _LOGGER.debug(args)
@@ -75,83 +71,20 @@ async def main() -> None:
         _LOGGER.info("Audio will be saved to %s", args.output_dir)
 
     # Resolve wake word model paths
-    models_dir = Path(args.models_dir)
     state = State(
-        models_dir=models_dir,
+        models_dir=Path(args.models_dir),
+        custom_model_dirs=[Path(d) for d in args.custom_model_dir],
         debug_probability=args.debug_probability,
         output_dir=args.output_dir,
     )
 
-    # Resolve built-in models
-    for model in args.model:
-        model_path = Path(model)
-        if not model_path.exists():
-            # Try relative to models dir
-            model_path = models_dir / model
-
-            if not model_path.exists():
-                # Try with version + extension
-                model_path = models_dir / f"{model}_v0.1.tflite"
-                assert (
-                    model_path.exists()
-                ), f"Missing model: {model} (looked in: {models_dir.absolute()})"
-
-        state.model_paths[model] = model_path
-
-    # Search for custom wake word models
-    for custom_model_dir in args.custom_model_dir:
-        custom_model_dir = Path(custom_model_dir)
-        for custom_model_file in custom_model_dir.glob("*.tflite"):
-            state.model_paths[custom_model_file.stem] = custom_model_file
-            _LOGGER.debug("Found custom model: %s", custom_model_file)
-
-    wyoming_info = Info(
-        wake=[
-            WakeProgram(
-                name="openwakeword",
-                description="An open-source audio wake word (or phrase) detection framework with a focus on performance and simplicity.",
-                attribution=Attribution(
-                    name="dscripka", url="https://github.com/dscripka/openWakeWord"
-                ),
-                installed=True,
-                models=[
-                    WakeModel(
-                        name=model_key,
-                        # hey_jarvis_v0.1 => hey jarvis
-                        description=" ".join(model_path.stem.split("_")[:-1]),
-                        attribution=Attribution(
-                            name="dscripka",
-                            url="https://github.com/dscripka/openWakeWord",
-                        ),
-                        installed=True,
-                        languages=[],
-                    )
-                    for model_key, model_path in state.model_paths.items()
-                ],
-            )
-        ],
+    # Pre-load models
+    ensure_loaded(
+        state,
+        args.preload_model,
+        threshold=args.threshold,
+        trigger_level=args.trigger_level,
     )
-
-    loop = asyncio.get_running_loop()
-
-    # One thread per wake word model
-    for model_key in args.preload_model:
-        maybe_model_path = state.model_paths.get(model_key)
-        if maybe_model_path is None:
-            raise ValueError(f"Cannot preload model: {model_key}")
-
-        state.wake_words[model_key] = WakeWordState()
-        state.ww_threads[model_key] = Thread(
-            target=ww_proc,
-            daemon=True,
-            args=(
-                state,
-                model_key,
-                maybe_model_path,
-                loop,
-            ),
-        )
-        state.ww_threads[model_key].start()
 
     # audio -> mels
     mels_thread = Thread(target=mels_proc, daemon=True, args=(state,))
@@ -166,7 +99,7 @@ async def main() -> None:
     server = AsyncServer.from_uri(args.uri)
 
     try:
-        await server.run(partial(OpenWakeWordEventHandler, wyoming_info, args, state))
+        await server.run(partial(OpenWakeWordEventHandler, args, state))
     except KeyboardInterrupt:
         pass
     finally:
@@ -185,6 +118,7 @@ async def main() -> None:
 
 
 # -----------------------------------------------------------------------------
+
 
 if __name__ == "__main__":
     try:
