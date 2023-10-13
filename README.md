@@ -9,6 +9,29 @@
 
 [Source](https://github.com/home-assistant/addons/tree/master/openwakeword)
 
+
+## Local Install
+
+Clone the repository and set up Python virtual environment:
+
+``` sh
+git clone https://github.com/rhasspy/wyoming-openwakeword.git
+cd wyoming-openwakeword
+script/setup
+```
+
+Run a server that anyone can connect to:
+
+``` sh
+script/run --uri 'tcp://0.0.0.0:10400'
+```
+
+See `script/run --help` for more options, including:
+
+* `--custom-model-dir <DIR>` - look for custom wake word models in `<DIR>`
+* `--debug` - print lots of information to console
+
+
 ## Docker Image
 
 ``` sh

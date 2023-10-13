@@ -190,10 +190,10 @@ class OpenWakeWordEventHandler(AsyncEventHandler):
 def ensure_loaded(state: State, names: List[str], threshold: float, trigger_level: int):
     """Ensure wake words are loaded by name."""
     with state.ww_threads_lock, state.clients_lock:
-        for model_key in names:
-            norm_model_key = _normalize_key(model_key)
+        for model_name in names:
+            norm_model_name = _normalize_key(model_name)
 
-            ww_state = state.wake_words.get(model_key)
+            ww_state = state.wake_words.get(model_name)
             if ww_state is not None:
                 # Already loaded
                 continue
@@ -201,21 +201,22 @@ def ensure_loaded(state: State, names: List[str], threshold: float, trigger_leve
             model_paths = _get_wake_word_files(state)
             model_path: Optional[Path] = None
             for maybe_model_path in model_paths:
-                if norm_model_key == _normalize_key(maybe_model_path.stem):
+                if norm_model_name == _normalize_key(maybe_model_path.stem):
                     # Exact match
                     model_path = maybe_model_path
                     break
 
                 if match := _WAKE_WORD_WITH_VERSION.match(maybe_model_path.stem):
                     # Exclude version
-                    if norm_model_key == _normalize_key(match.group(1)):
+                    if norm_model_name == _normalize_key(match.group(1)):
                         model_path = maybe_model_path
                         break
 
             if model_path is None:
-                raise ValueError(f"Wake word model not found: {model_key}")
+                raise ValueError(f"Wake word model not found: {model_name}")
 
             # Start thread for model
+            model_key = model_path.stem
             state.wake_words[model_key] = WakeWordState()
             state.ww_threads[model_key] = Thread(
                 target=ww_proc,
