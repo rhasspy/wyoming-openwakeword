@@ -48,7 +48,7 @@ def mels_proc(state: State):
                 break
 
             while True:
-                with state.audio_lock, state.clients_lock:
+                with state.clients_lock, state.audio_lock:
                     # Collect batch
                     todo_ids = [
                         client_id
@@ -94,7 +94,7 @@ def mels_proc(state: State):
                 mels = (mels / 10) + 2  # transform to fit embedding
 
                 num_mel_windows = mels.shape[2]
-                with state.mels_lock, state.clients_lock:
+                with state.clients_lock, state.mels_lock:
                     # Add to client mels
                     for i, client_id in enumerate(todo_ids):
                         client = state.clients.get(client_id)
@@ -144,7 +144,7 @@ def embeddings_proc(state: State):
                 break
 
             while True:
-                with state.mels_lock, state.clients_lock:
+                with state.clients_lock, state.mels_lock:
                     # Collect batch
                     todo_ids = [
                         client_id
@@ -191,7 +191,7 @@ def embeddings_proc(state: State):
 
                 num_embedding_windows = embeddings.shape[2]
                 for ww_name, ww_state in state.wake_words.items():
-                    with ww_state.embeddings_lock, state.clients_lock:
+                    with state.clients_lock, ww_state.embeddings_lock:
                         # Add to wake word model embeddings
                         for i, client_id in enumerate(todo_ids):
                             client = state.clients.get(client_id)
@@ -253,7 +253,7 @@ def ww_proc(
                 break
 
             while True:
-                with ww_state.embeddings_lock, state.clients_lock:
+                with state.clients_lock, ww_state.embeddings_lock:
                     # Collect batch
                     todo_ids = [
                         client_id
