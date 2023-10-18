@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Dict, Final, Tuple
+from typing import Dict, Final, Optional, Set, Tuple
 
 import numpy as np
 from wyoming.server import AsyncEventHandler
@@ -64,6 +64,7 @@ class ClientData:
         default_factory=lambda: np.zeros(shape=(_MAX_MELS, NUM_MELS), dtype=np.float32)
     )
     wake_words: Dict[str, WakeWordData] = field(default_factory=dict)
+    wake_word_names: Optional[Set[str]] = None
 
     def reset(self) -> None:
         self.audio.fill(0)

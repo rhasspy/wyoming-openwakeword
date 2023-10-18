@@ -199,6 +199,12 @@ def embeddings_proc(state: State):
                                 # Client disconnected
                                 continue
 
+                            if client.wake_word_names and (
+                                ww_name not in client.wake_word_names
+                            ):
+                                # Skip processing wake words that won't be used
+                                continue
+
                             # Shift
                             client_data = client.wake_words[ww_name]
                             client_data.embeddings[

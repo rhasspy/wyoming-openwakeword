@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.8.0
+
+- Include fix for potential deadlock
+- Only process wake words that a client requests
+
 ## 1.7.1
 
 - Always use wake word file name as key

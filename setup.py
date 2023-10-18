@@ -20,7 +20,7 @@ model_files = [str(f.relative_to(module_dir)) for f in models_dir.glob("*.tflite
 
 setup(
     name="wyoming_openwakeword",
-    version="1.7.1",
+    version="1.8.0",
     description="Wyoming server for openWakeWord",
     url="http://github.com/rhasspy/wyoming-openwakeword",
     author="Michael Hansen",

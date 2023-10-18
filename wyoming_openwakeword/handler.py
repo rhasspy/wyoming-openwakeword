@@ -75,6 +75,9 @@ class OpenWakeWordEventHandler(AsyncEventHandler):
                     threshold=self.cli_args.threshold,
                     trigger_level=self.cli_args.trigger_level,
                 )
+
+                # Only process audio with these wake word models
+                self.data.wake_word_names = set(detect.names)
         elif AudioStart.is_type(event.type):
             # Reset
             for ww_data in self.data.wake_words.values():
