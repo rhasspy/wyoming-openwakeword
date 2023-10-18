@@ -48,7 +48,7 @@ def mels_proc(state: State):
                 break
 
             while True:
-                with state.audio_lock, state.clients_lock:
+                with state.clients_lock, state.audio_lock:
                     # Collect batch
                     todo_ids = [
                         client_id
@@ -94,7 +94,7 @@ def mels_proc(state: State):
                 mels = (mels / 10) + 2  # transform to fit embedding
 
                 num_mel_windows = mels.shape[2]
-                with state.mels_lock, state.clients_lock:
+                with state.clients_lock, state.mels_lock:
                     # Add to client mels
                     for i, client_id in enumerate(todo_ids):
                         client = state.clients.get(client_id)
@@ -144,7 +144,7 @@ def embeddings_proc(state: State):
                 break
 
             while True:
-                with state.mels_lock, state.clients_lock:
+                with state.clients_lock, state.mels_lock:
                     # Collect batch
                     todo_ids = [
                         client_id
@@ -190,35 +190,34 @@ def embeddings_proc(state: State):
                 embeddings = embedding_model.get_tensor(embedding_output_index)
 
                 num_embedding_windows = embeddings.shape[2]
-                with state.clients_lock:
-                    for ww_name, ww_state in state.wake_words.items():
-                        with ww_state.embeddings_lock:
-                            # Add to wake word model embeddings
-                            for i, client_id in enumerate(todo_ids):
-                                client = state.clients.get(client_id)
-                                if client is None:
-                                    # Client disconnected
-                                    continue
+                for ww_name, ww_state in state.wake_words.items():
+                    with state.clients_lock, ww_state.embeddings_lock:
+                        # Add to wake word model embeddings
+                        for i, client_id in enumerate(todo_ids):
+                            client = state.clients.get(client_id)
+                            if client is None:
+                                # Client disconnected
+                                continue
 
-                                # Shift
-                                client_data = client.wake_words[ww_name]
-                                client_data.embeddings[
-                                    :-num_embedding_windows
-                                ] = client_data.embeddings[num_embedding_windows:]
+                            # Shift
+                            client_data = client.wake_words[ww_name]
+                            client_data.embeddings[
+                                :-num_embedding_windows
+                            ] = client_data.embeddings[num_embedding_windows:]
 
-                                # Overwrite
-                                client_data.embeddings[
-                                    -num_embedding_windows:
-                                ] = embeddings[i, 0, :, :]
-                                client_data.new_embeddings = min(
-                                    len(client_data.embeddings),
-                                    client_data.new_embeddings + num_embedding_windows,
-                                )
+                            # Overwrite
+                            client_data.embeddings[
+                                -num_embedding_windows:
+                            ] = embeddings[i, 0, :, :]
+                            client_data.new_embeddings = min(
+                                len(client_data.embeddings),
+                                client_data.new_embeddings + num_embedding_windows,
+                            )
 
-                                # Update timestamp
-                                client_data.embeddings_timestamp = todo_timestamps[i]
+                            # Update timestamp
+                            client_data.embeddings_timestamp = todo_timestamps[i]
 
-                        ww_state.embeddings_ready.release()
+                    ww_state.embeddings_ready.release()
 
     except Exception:
         _LOGGER.exception("Unexpected error in embeddings thread")
@@ -254,7 +253,7 @@ def ww_proc(
                 break
 
             while True:
-                with ww_state.embeddings_lock, state.clients_lock:
+                with state.clients_lock, ww_state.embeddings_lock:
                     # Collect batch
                     todo_ids = [
                         client_id

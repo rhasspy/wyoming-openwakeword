@@ -189,7 +189,7 @@ class OpenWakeWordEventHandler(AsyncEventHandler):
 
 def ensure_loaded(state: State, names: List[str], threshold: float, trigger_level: int):
     """Ensure wake words are loaded by name."""
-    with state.ww_threads_lock, state.clients_lock:
+    with state.clients_lock, state.ww_threads_lock:
         for model_name in names:
             norm_model_name = _normalize_key(model_name)
 
