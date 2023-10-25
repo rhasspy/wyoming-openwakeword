@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from datetime import datetime
-from typing import List, Optional, TextIO
+from typing import Dict, List, Optional, TextIO
 
 import numpy as np
 import tflite_runtime.interpreter as tflite
@@ -238,7 +238,7 @@ def ww_proc(
     ww_model_path: str,
     loop: asyncio.AbstractEventLoop,
 ):
-    """Transform embedding features to wake word probabilities (with batching)."""
+    """Transform embedding features to wake word probabilities (without batching)."""
     try:
         _LOGGER.debug("Loading %s from %s", ww_model_key, ww_model_path)
         ww_model = tflite.Interpreter(model_path=str(ww_model_path), num_threads=1)
@@ -259,28 +259,21 @@ def ww_proc(
                 break
 
             while True:
+                todo_timestamps: Dict[str, int] = {}
+                todo_embeddings: Dict[str, np.ndarray] = {}
+
                 with state.clients_lock, ww_state.embeddings_lock:
-                    # Collect batch
-                    todo_ids = [
-                        client_id
-                        for client_id, client in state.clients.items()
-                        if client.wake_words[ww_model_key].new_embeddings >= ww_windows
-                    ]
-                    batch_size = len(todo_ids)
-                    if batch_size < 1:
-                        # Not enough audio to process
-                        break
-
-                    embeddings_tensor = np.zeros(
-                        shape=(batch_size, ww_windows, WW_FEATURES),
-                        dtype=np.float32,
-                    )
-
-                    todo_timestamps: List[int] = []
-                    for i, client_id in enumerate(todo_ids):
-                        client = state.clients[client_id]
+                    for client_id, client in state.clients.items():
                         client_data = client.wake_words[ww_model_key]
-                        embeddings_tensor[i, :] = client_data.embeddings[
+                        if client_data.new_embeddings < ww_windows:
+                            continue
+
+                        embeddings_tensor = np.zeros(
+                            shape=(1, ww_windows, WW_FEATURES),
+                            dtype=np.float32,
+                        )
+
+                        embeddings_tensor[0, :] = client_data.embeddings[
                             -client_data.new_embeddings : len(client_data.embeddings)
                             - client_data.new_embeddings
                             + ww_windows
@@ -288,27 +281,32 @@ def ww_proc(
                         client_data.new_embeddings = max(
                             0, client_data.new_embeddings - 1
                         )
-                        todo_timestamps.append(client_data.embeddings_timestamp)
+                        todo_timestamps[client_id] = client_data.embeddings_timestamp
 
                         # Shift timestamp
                         client_data.embeddings_timestamp += MS_PER_CHUNK
 
-                ww_model.resize_tensor_input(
-                    ww_input_index,
-                    embeddings_tensor.shape,
-                    strict=False,  # must be False for non-dynamic batch dim
-                )
-                ww_model.allocate_tensors()
+                        todo_embeddings[client_id] = embeddings_tensor
 
-                # Generate probabilities
-                ww_model.set_tensor(ww_input_index, embeddings_tensor)
-                ww_model.invoke()
-                probabilities = ww_model.get_tensor(ww_output_index)
+                if not todo_embeddings:
+                    break
 
-                coros = []
-                with state.clients_lock:
-                    for i, probability in enumerate(probabilities):
-                        client_id = todo_ids[i]
+                for client_id, embeddings_tensor in todo_embeddings.items():
+                    ww_model.resize_tensor_input(
+                        ww_input_index,
+                        embeddings_tensor.shape,
+                        strict=False,  # must be False for non-dynamic batch dim
+                    )
+                    ww_model.allocate_tensors()
+
+                    # Generate probabilities
+                    ww_model.set_tensor(ww_input_index, embeddings_tensor)
+                    ww_model.invoke()
+                    probabilities = ww_model.get_tensor(ww_output_index)
+                    probability = probabilities[0]
+
+                    coros = []
+                    with state.clients_lock:
                         client = state.clients.get(client_id)
                         if client is None:
                             # Client disconnected
@@ -349,7 +347,7 @@ def ww_proc(
                                     client.event_handler.write_event(
                                         Detection(
                                             name=ww_model_key,
-                                            timestamp=todo_timestamps[i],
+                                            timestamp=todo_timestamps[client_id],
                                         ).event()
                                     ),
                                 )
@@ -375,12 +373,12 @@ def ww_proc(
                             prob_file.close()
                             prob_file = None
 
-                # Run outside lock just to be safe
-                for coro in coros:
-                    asyncio.run_coroutine_threadsafe(coro, loop)
+                    # Run outside lock just to be safe
+                    for coro in coros:
+                        asyncio.run_coroutine_threadsafe(coro, loop)
 
     except Exception:
-        _LOGGER.exception("Unexpected error in wake word thread")
+        _LOGGER.exception("Unexpected error in wake word thread (%s)", ww_model_key)
 
 
 def _timestamp() -> str:
