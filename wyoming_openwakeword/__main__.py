@@ -40,13 +40,13 @@ async def main() -> None:
         "--threshold",
         type=float,
         default=0.5,
-        help="Wake word model threshold (0-1, default: 0.5)",
+        help="Wake word model threshold (0.0-1.0, default: 0.5)",
     )
     parser.add_argument(
         "--trigger-level",
         type=int,
         default=1,
-        help="Number of activations before detection (default: 4)",
+        help="Number of activations before detection (default: 1)",
     )
     #
     parser.add_argument("--output-dir", help="Path to save audio and detections")
