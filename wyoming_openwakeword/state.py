@@ -33,7 +33,11 @@ class State:
     mels_ready: Semaphore = field(default_factory=Semaphore)
     mels_lock: Lock = field(default_factory=Lock)
 
+    # full name -> state
     wake_words: Dict[str, WakeWordState] = field(default_factory=dict)
+
+    # alias -> full name
+    wake_word_aliases: Dict[str, str] = field(default_factory=dict)
 
     debug_probability: bool = False
     output_dir: Optional[Path] = None
