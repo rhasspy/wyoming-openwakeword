@@ -216,6 +216,7 @@ def ensure_loaded(state: State, names: List[str], threshold: float, trigger_leve
                     # Exclude version
                     if norm_model_name == _normalize_key(match.group(1)):
                         model_path = maybe_model_path
+                        state.wake_word_aliases[model_name] = model_path.stem
                         break
 
             if model_path is None:
