@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Dict, List, Optional, TextIO
 
 import numpy as np
+
 try:
     import tflite_runtime.interpreter as tflite
 except ModuleNotFoundError:
