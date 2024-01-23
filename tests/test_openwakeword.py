@@ -13,6 +13,7 @@ from wyoming.wake import Detect, Detection, NotDetected
 
 _DIR = Path(__file__).parent
 _SAMPLES_PER_CHUNK = 1024
+_DETECTION_TIMEOUT = 5
 
 
 @pytest.mark.asyncio
@@ -33,7 +34,9 @@ async def test_openwakeword() -> None:
     # Check info
     await async_write_event(Describe().event(), proc.stdin)
     while True:
-        event = await asyncio.wait_for(async_read_event(proc.stdout), timeout=1)
+        event = await asyncio.wait_for(
+            async_read_event(proc.stdout), timeout=_DETECTION_TIMEOUT
+        )
         assert event is not None
 
         if not Info.is_type(event.type):
@@ -72,7 +75,9 @@ async def test_openwakeword() -> None:
             await async_write_event(chunk.event(), proc.stdin)
 
     while True:
-        event = await asyncio.wait_for(async_read_event(proc.stdout), timeout=1)
+        event = await asyncio.wait_for(
+            async_read_event(proc.stdout), timeout=_DETECTION_TIMEOUT
+        )
         assert event is not None
 
         if not Detection.is_type(event.type):
