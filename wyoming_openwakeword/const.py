@@ -38,16 +38,19 @@ class WakeWordData:
         )
     )
     embeddings_timestamp: int = 0
+    ww_windows: Optional[int] = None
     is_detected: bool = False
     activations: int = 0
     threshold: float = 0.5
     trigger_level: int = 1
+    is_processing: bool = False
 
     def reset(self) -> None:
         self.new_embeddings = 0
         self.embeddings.fill(0)
         self.is_detected = False
         self.activations = 0
+        self.is_processing = False
 
 
 @dataclass

@@ -17,7 +17,7 @@ from wyoming.server import AsyncEventHandler
 from wyoming.wake import Detect, NotDetected
 
 from . import __version__
-from .const import ClientData, WakeWordData
+from .const import EMB_FEATURES, MEL_SAMPLES, ClientData, WakeWordData
 from .openwakeword import ww_proc
 from .state import State, WakeWordState
 
@@ -130,9 +130,15 @@ class OpenWakeWordEventHandler(AsyncEventHandler):
         elif AudioStop.is_type(event.type):
             # Inform client if no detections occurred
             while True:
-                if all(
-                    ww_data.new_embeddings <= 0
-                    for ww_data in self.data.wake_words.values()
+                if (
+                    (self.data.new_audio_samples < MEL_SAMPLES)
+                    and (self.data.new_mels < EMB_FEATURES)
+                    and all(
+                        (ww_data.ww_windows is not None)
+                        and (ww_data.new_embeddings < ww_data.ww_windows)
+                        and (not ww_data.is_processing)
+                        for ww_data in self.data.wake_words.values()
+                    )
                 ):
                     break
 
@@ -152,8 +158,6 @@ class OpenWakeWordEventHandler(AsyncEventHandler):
             if self.audio_writer is not None:
                 self.audio_writer.close()
                 self.audio_writer = None
-
-            return False
         else:
             _LOGGER.debug("Unexpected event: type=%s, data=%s", event.type, event.data)
 

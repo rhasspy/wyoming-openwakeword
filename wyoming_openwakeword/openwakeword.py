@@ -266,9 +266,14 @@ def ww_proc(
                     for client_id, client in state.clients.items():
                         client_data = client.wake_words[ww_model_key]
 
+                        if client_data.ww_windows is None:
+                            # Number of feature windows needed for this model
+                            client_data.ww_windows = ww_windows
+
                         if client_data.new_embeddings < ww_windows:
                             continue
 
+                        client_data.is_processing = True
                         embeddings_tensor = np.zeros(
                             shape=(1, ww_windows, WW_FEATURES),
                             dtype=np.float32,
@@ -377,6 +382,8 @@ def ww_proc(
                     # Run outside lock just to be safe
                     for coro in coros:
                         asyncio.run_coroutine_threadsafe(coro, loop)
+
+                    client_data.is_processing = False
 
     except Exception:
         _LOGGER.exception("Unexpected error in wake word thread (%s)", ww_model_key)

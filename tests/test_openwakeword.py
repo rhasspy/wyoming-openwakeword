@@ -74,11 +74,16 @@ async def test_openwakeword() -> None:
         for chunk in wav_to_chunks(ok_nabu_wav, _SAMPLES_PER_CHUNK):
             await async_write_event(chunk.event(), proc.stdin)
 
+    await async_write_event(AudioStop().event(), proc.stdin)
+
     while True:
         event = await asyncio.wait_for(
             async_read_event(proc.stdout), timeout=_DETECTION_TIMEOUT
         )
-        assert event is not None
+        if event is None:
+            proc.stdin.close()
+            _, stderr = await proc.communicate()
+            assert False, stderr.decode()
 
         if not Detection.is_type(event.type):
             continue
@@ -104,7 +109,10 @@ async def test_openwakeword() -> None:
 
     while True:
         event = await asyncio.wait_for(async_read_event(proc.stdout), timeout=1)
-        assert event is not None
+        if event is None:
+            proc.stdin.close()
+            _, stderr = await proc.communicate()
+            assert False, stderr.decode()
 
         if not NotDetected.is_type(event.type):
             continue
