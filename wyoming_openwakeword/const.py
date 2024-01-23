@@ -68,7 +68,7 @@ class ClientData:
 
     def reset(self) -> None:
         self.audio.fill(0)
-        self.new_audio_samples = 0
+        self.new_audio_samples = _AUTOFILL_SECONDS * _SAMPLE_RATE
         self.mels.fill(0)
         self.new_mels = 0
         for ww_data in self.wake_words.values():

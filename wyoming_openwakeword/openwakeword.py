@@ -265,6 +265,7 @@ def ww_proc(
                 with state.clients_lock, ww_state.embeddings_lock:
                     for client_id, client in state.clients.items():
                         client_data = client.wake_words[ww_model_key]
+
                         if client_data.new_embeddings < ww_windows:
                             continue
 

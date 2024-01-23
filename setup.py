@@ -14,19 +14,22 @@ if requirements_path.is_file():
         requirements = requirements_file.read().splitlines()
 
 models_dir = module_dir / "models"
-model_files = [str(f.relative_to(module_dir)) for f in models_dir.glob("*.tflite")]
+data_files = [str(f.relative_to(module_dir)) for f in models_dir.glob("*.tflite")]
+
+version_path = module_dir / "VERSION"
+version = version_path.read_text(encoding="utf-8").strip()
 
 # -----------------------------------------------------------------------------
 
 setup(
     name="wyoming_openwakeword",
-    version="1.8.2",
+    version=version,
     description="Wyoming server for openWakeWord",
     url="http://github.com/rhasspy/wyoming-openwakeword",
     author="Michael Hansen",
     author_email="mike@rhasspy.org",
     packages=setuptools.find_packages(),
-    package_data={"wyoming_openwakeword": model_files},
+    package_data={"wyoming_openwakeword": data_files},
     install_requires=requirements,
     classifiers=[
         "Development Status :: 3 - Alpha",
@@ -40,8 +43,6 @@ setup(
     ],
     keywords="rhasspy wyoming openwakeword",
     entry_points={
-        'console_scripts': [
-            'wyoming-openwakeword = wyoming_openwakeword:__main__.run'
-        ]
+        "console_scripts": ["wyoming-openwakeword = wyoming_openwakeword:__main__.run"]
     },
 )

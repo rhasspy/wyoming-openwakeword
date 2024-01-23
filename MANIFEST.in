@@ -1,2 +1,3 @@
 include requirements.txt
 include wyoming_openwakeword/models/*.tflite
+include wyoming_openwakeword/VERSION

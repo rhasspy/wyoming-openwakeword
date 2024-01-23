@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.9.0
+
+- Add tests and Github actions
+- Handle wake word aliases correctly
+- Autofill silence when client connects
+- Wait for processing to finish on audio-stop before sending not-detected
+- Add --log-format argument
+- Add --version argument
+
 ## 1.8.1
 
 - Remove batching from wake word processing since not all models support it

@@ -8,6 +8,7 @@ from threading import Thread
 
 from wyoming.server import AsyncServer
 
+from . import __version__
 from .handler import OpenWakeWordEventHandler, ensure_loaded
 from .openwakeword import embeddings_proc, mels_proc
 from .state import State
@@ -53,16 +54,30 @@ async def main() -> None:
     #
     parser.add_argument("--debug", action="store_true", help="Log DEBUG messages")
     parser.add_argument(
+        "--log-format", default=logging.BASIC_FORMAT, help="Format for log messages"
+    )
+    parser.add_argument(
         "--debug-probability",
         action="store_true",
         help="Log all wake word probabilities (VERY noisy)",
     )
+    parser.add_argument("--version", action="store_true", help="Print version and exit")
     #
     parser.add_argument("--model", action="append", default=[], help="Deprecated")
 
     args = parser.parse_args()
-    logging.basicConfig(level=logging.DEBUG if args.debug else logging.INFO)
+
+    if args.debug_probability:
+        args.debug = True
+
+    logging.basicConfig(
+        level=logging.DEBUG if args.debug else logging.INFO, format=args.log_format
+    )
     _LOGGER.debug(args)
+
+    if args.version:
+        print(__version__)
+        return
 
     if args.output_dir:
         # Directory to save audio clips and chunk probabilities
