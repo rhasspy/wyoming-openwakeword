@@ -44,6 +44,6 @@ setup(
     ],
     keywords="rhasspy wyoming openwakeword",
     entry_points={
-        "console_scripts": ["wyoming-openwakeword = wyoming_openwakeword:__main__.run"]
+        "console_scripts": ["wyoming-openwakeword = wyoming_openwakeword.__main__:run"]
     },
 )
