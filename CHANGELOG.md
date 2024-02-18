@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.10.0
+
+- Upgrade to wyoming 1.5.3
+- Add wake word phrase
+
 ## 1.9.0
 
 - Add tests and Github actions
