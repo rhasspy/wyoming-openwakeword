@@ -192,6 +192,7 @@ class OpenWakeWordEventHandler(AsyncEventHandler):
                             name=model_path.stem,
                             # hey_jarvis_v0.1 => hey jarvis
                             description=_get_description(model_path.stem),
+                            phrase=_get_description(model_path.stem),
                             attribution=Attribution(
                                 name="dscripka",
                                 url="https://github.com/dscripka/openWakeWord",

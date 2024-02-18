@@ -1,4 +1,5 @@
 """Tests for wyoming-openwakeword"""
+
 import asyncio
 import sys
 import wave
@@ -18,6 +19,7 @@ _DETECTION_TIMEOUT = 5
 
 @pytest.mark.asyncio
 async def test_openwakeword() -> None:
+    """Test a detection with sample audio."""
     proc = await asyncio.create_subprocess_exec(
         sys.executable,
         "-m",
@@ -51,6 +53,7 @@ async def test_openwakeword() -> None:
         for ww_model in wake.models:
             if ww_model.name == "ok_nabu_v0.1":
                 assert ww_model.description == "ok nabu"
+                assert ww_model.phrase == "ok nabu"
                 assert ww_model.version == "v0.1"
                 model_found = True
                 break

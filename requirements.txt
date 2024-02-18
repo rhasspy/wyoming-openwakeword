@@ -1,2 +1,2 @@
 tflite-runtime-nightly
-wyoming==1.5.2
+wyoming==1.5.3
