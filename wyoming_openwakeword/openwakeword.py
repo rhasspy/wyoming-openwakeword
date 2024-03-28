@@ -21,7 +21,6 @@ from .const import (
     WW_FEATURES,
 )
 from .state import ClientData, State
-from .vad import VAD
 
 _MS_PER_CHUNK = SAMPLES_PER_CHUNK // 16
 
