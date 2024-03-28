@@ -21,6 +21,7 @@ from .const import (
     WW_FEATURES,
 )
 from .state import ClientData, State
+from .vad import VAD
 
 _MS_PER_CHUNK = SAMPLES_PER_CHUNK // 16
 
@@ -71,11 +72,13 @@ def mels_proc(state: State):
                     todo_timestamps: List[int] = []
                     for i, client_id in enumerate(todo_ids):
                         client = state.clients[client_id]
-                        audio_tensor[i, :] = client.audio[
+                        audio = client.audio[
                             -client.new_audio_samples : len(client.audio)
                             - client.new_audio_samples
                             + MEL_SAMPLES
                         ]
+                        audio_tensor[i, :] = audio
+                        client.vad(audio)
                         client.new_audio_samples = max(
                             0, client.new_audio_samples - SAMPLES_PER_CHUNK
                         )
@@ -241,6 +244,7 @@ def ww_proc(
     ww_model_key: str,
     ww_model_path: str,
     loop: asyncio.AbstractEventLoop,
+    vad_threshold: float,
 ):
     """Transform embedding features to wake word probabilities (without batching)."""
     try:
@@ -251,7 +255,6 @@ def ww_proc(
         ww_windows = ww_input_shape[1]
         ww_input_index = ww_input["index"]
         ww_output_index = ww_model.get_output_details()[0]["index"]
-
         # ww = [batch x window x features (96)] => [batch x probability]
 
         client: Optional[ClientData] = None
@@ -322,12 +325,16 @@ def ww_proc(
                             # Client disconnected
                             continue
 
+                        vad_frames = list(client.vad.prediction_buffer)[-7:-4]
+                        vad_max_score = np.max(vad_frames) if len(vad_frames) > 0 else 0
+                        voice_detected = (vad_threshold <= 0.0 or vad_max_score >= vad_threshold)
                         if state.debug_probability:
                             _LOGGER.debug(
-                                "client=%s, wake_word=%s, probability=%s",
+                                "client=%s, wake_word=%s, probability=%s, vad_probability=%s",
                                 client_id,
                                 ww_model_key,
                                 probability.item(),
+                                vad_max_score,
                             )
 
                         prob_file: Optional[TextIO] = None
@@ -346,7 +353,8 @@ def ww_proc(
                             )
 
                         client_data = client.wake_words[ww_model_key]
-                        if probability.item() >= client_data.threshold:
+
+                        if probability.item() >= client_data.threshold and voice_detected:
                             # Increase activation
                             client_data.activations += 1
 
