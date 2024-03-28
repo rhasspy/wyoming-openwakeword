@@ -4,6 +4,8 @@ from typing import Dict, Final, Optional, Set, Tuple
 import numpy as np
 from wyoming.server import AsyncEventHandler
 
+from .vad import VAD
+
 _AUTOFILL_SECONDS: Final = 3
 _MAX_SECONDS: Final = 10
 
@@ -68,6 +70,7 @@ class ClientData:
     )
     wake_words: Dict[str, WakeWordData] = field(default_factory=dict)
     wake_word_names: Optional[Set[str]] = None
+    vad: VAD = VAD()
 
     def reset(self) -> None:
         self.audio.fill(0)

@@ -75,6 +75,7 @@ class OpenWakeWordEventHandler(AsyncEventHandler):
                     detect.names,
                     threshold=self.cli_args.threshold,
                     trigger_level=self.cli_args.trigger_level,
+                    vad_threshold=self.cli_args.vad_threshold,
                 )
 
                 # Only process audio with these wake word models
@@ -145,6 +146,8 @@ class OpenWakeWordEventHandler(AsyncEventHandler):
                 # Wait until no new embeddings still need to be processed
                 await asyncio.sleep(0.1)
 
+            self.data.vad.reset_states()
+
             if not any(
                 ww_data.is_detected for ww_data in self.data.wake_words.values()
             ):
@@ -211,7 +214,7 @@ class OpenWakeWordEventHandler(AsyncEventHandler):
 # -----------------------------------------------------------------------------
 
 
-def ensure_loaded(state: State, names: List[str], threshold: float, trigger_level: int):
+def ensure_loaded(state: State, names: List[str], threshold: float, trigger_level: int, vad_threshold: float):
     """Ensure wake words are loaded by name."""
     with state.clients_lock, state.ww_threads_lock:
         for model_name in names:
@@ -251,6 +254,7 @@ def ensure_loaded(state: State, names: List[str], threshold: float, trigger_leve
                     model_key,
                     model_path,
                     asyncio.get_running_loop(),
+                    vad_threshold,
                 ),
             )
             state.ww_threads[model_key].start()

@@ -49,6 +49,12 @@ async def main() -> None:
         default=1,
         help="Number of activations before detection (default: 1)",
     )
+    parser.add_argument(
+        "--vad-threshold",
+        type=float,
+        default=0.0,
+        help="Voice Activation Detection threshold (0.0-1.0, default: 0.0)",
+    )
     #
     parser.add_argument("--output-dir", help="Path to save audio and detections")
     #
@@ -99,6 +105,7 @@ async def main() -> None:
         args.preload_model,
         threshold=args.threshold,
         trigger_level=args.trigger_level,
+        vad_threshold=args.vad_threshold,
     )
 
     # audio -> mels
