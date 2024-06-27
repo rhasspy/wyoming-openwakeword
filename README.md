@@ -28,22 +28,22 @@ script/run --uri 'tcp://0.0.0.0:10400'
 
 See `script/run --help` for more options, including:
 
+* `--threshold [0-1]` - default is 0.5, increase to avoid false activations
 * `--custom-model-dir <DIR>` - look for custom wake word models in `<DIR>`
-* `--debug` - print lots of information to console
+* `--debug` - print extra information to console
+* `--debug-probability` - print even more information for each audio chunk
 
 
 ## Docker Image
 
 ``` sh
-docker run -it -p 10400:10400 rhasspy/wyoming-openwakeword \
-    --preload-model 'ok_nabu'
+docker run -it -p 10400:10400 rhasspy/wyoming-openwakeword
 ```
 
 ### Custom Models
 
 ```sh
 docker run -it -p 10400:10400 -v /path/to/custom/models:/custom rhasspy/wyoming-openwakeword \
-    --preload-model 'ok_nabu' \
     --custom-model-dir /custom
 ```
 
