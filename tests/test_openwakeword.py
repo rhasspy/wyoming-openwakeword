@@ -58,7 +58,7 @@ async def test_openwakeword() -> None:
                 model_found = True
                 break
 
-        assert model_found, "Expected 'ok nabu' model"
+        assert model_found, f"Expected 'ok nabu' model in {wake.models}"
         break
 
     # We want to use the 'ok nabu' model

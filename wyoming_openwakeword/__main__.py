@@ -4,14 +4,12 @@ import asyncio
 import logging
 from functools import partial
 from pathlib import Path
-from threading import Thread
 
+import openwakeword
 from wyoming.server import AsyncServer
 
 from . import __version__
-from .handler import OpenWakeWordEventHandler, ensure_loaded
-from .openwakeword import embeddings_proc, mels_proc
-from .state import State
+from .handler import OpenWakeWordEventHandler
 
 _LOGGER = logging.getLogger()
 _DIR = Path(__file__).parent
@@ -19,12 +17,12 @@ _DIR = Path(__file__).parent
 
 async def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--uri", default="stdio://", help="unix:// or tcp://")
     parser.add_argument(
         "--models-dir",
         default=_DIR / "models",
         help="Path to directory with built-in models",
     )
+    parser.add_argument("--uri", default="stdio://", help="unix:// or tcp://")
     parser.add_argument(
         "--custom-model-dir",
         action="append",
@@ -32,25 +30,18 @@ async def main() -> None:
         help="Path to directory with custom wake word models",
     )
     parser.add_argument(
-        "--preload-model",
-        action="append",
-        default=[],
-        help="Name or path of wake word model(s) to pre-load",
-    )
-    parser.add_argument(
         "--threshold",
         type=float,
         default=0.5,
         help="Wake word model threshold (0.0-1.0, default: 0.5)",
     )
-    parser.add_argument(
-        "--trigger-level",
-        type=int,
-        default=1,
-        help="Number of activations before detection (default: 1)",
-    )
-    #
     parser.add_argument("--output-dir", help="Path to save audio and detections")
+    parser.add_argument(
+        "--refractory-seconds",
+        type=float,
+        default=0.5,
+        help="Seconds before the same wake word can be triggered again",
+    )
     #
     parser.add_argument("--debug", action="store_true", help="Log DEBUG messages")
     parser.add_argument(
@@ -62,8 +53,6 @@ async def main() -> None:
         help="Log all wake word probabilities (VERY noisy)",
     )
     parser.add_argument("--version", action="store_true", help="Print version and exit")
-    #
-    parser.add_argument("--model", action="append", default=[], help="Deprecated")
 
     args = parser.parse_args()
 
@@ -85,51 +74,38 @@ async def main() -> None:
         args.output_dir.mkdir(parents=True, exist_ok=True)
         _LOGGER.info("Audio will be saved to %s", args.output_dir)
 
-    # Resolve wake word model paths
-    state = State(
-        models_dir=Path(args.models_dir),
-        custom_model_dirs=[Path(d) for d in args.custom_model_dir],
-        debug_probability=args.debug_probability,
-        output_dir=args.output_dir,
-    )
+    models_dir = Path(args.models_dir)
 
-    # Pre-load models
-    ensure_loaded(
-        state,
-        args.preload_model,
-        threshold=args.threshold,
-        trigger_level=args.trigger_level,
-    )
+    # Patch model paths
+    for model_dict in (
+        openwakeword.FEATURE_MODELS,
+        openwakeword.VAD_MODELS,
+        openwakeword.MODELS,
+    ):
+        for model_value in model_dict.values():
+            model_path = Path(model_value["model_path"])
+            model_path = models_dir / model_path.name
+            model_value["model_path"] = str(model_path)
 
-    # audio -> mels
-    mels_thread = Thread(target=mels_proc, daemon=True, args=(state,))
-    mels_thread.start()
-
-    # mels -> embeddings
-    embeddings_thread = Thread(target=embeddings_proc, daemon=True, args=(state,))
-    embeddings_thread.start()
     _LOGGER.info("Ready")
 
     # Start server
     server = AsyncServer.from_uri(args.uri)
 
     try:
-        await server.run(partial(OpenWakeWordEventHandler, args, state))
+        await server.run(
+            partial(
+                OpenWakeWordEventHandler,
+                models_dir,
+                [Path(d) for d in args.custom_model_dir],
+                args.threshold,
+                args.refractory_seconds,
+                Path(args.output_dir) if args.output_dir else None,
+                args.debug_probability,
+            )
+        )
     except KeyboardInterrupt:
         pass
-    finally:
-        # Graceful shutdown
-        _LOGGER.debug("Shutting down")
-        state.is_running = False
-        state.audio_ready.release()
-        mels_thread.join()
-
-        state.mels_ready.release()
-        embeddings_thread.join()
-
-        for ww_name, ww_state in state.wake_words.items():
-            ww_state.embeddings_ready.release()
-            state.ww_threads[ww_name].join()
 
 
 # -----------------------------------------------------------------------------
