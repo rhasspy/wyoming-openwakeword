@@ -28,7 +28,6 @@ async def test_openwakeword() -> None:
         "stdio://",
         stdin=PIPE,
         stdout=PIPE,
-        stderr=PIPE,
     )
     assert proc.stdin is not None
     assert proc.stdout is not None

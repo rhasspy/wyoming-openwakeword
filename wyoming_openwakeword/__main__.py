@@ -9,6 +9,7 @@ import openwakeword
 from wyoming.server import AsyncServer
 
 from . import __version__
+from .const import Settings
 from .handler import OpenWakeWordEventHandler
 
 _LOGGER = logging.getLogger()
@@ -96,12 +97,14 @@ async def main() -> None:
         await server.run(
             partial(
                 OpenWakeWordEventHandler,
-                models_dir,
-                [Path(d) for d in args.custom_model_dir],
-                args.threshold,
-                args.refractory_seconds,
-                Path(args.output_dir) if args.output_dir else None,
-                args.debug_probability,
+                Settings(
+                    builtin_models_dir=models_dir,
+                    custom_model_dirs=[Path(d) for d in args.custom_model_dir],
+                    threshold=args.threshold,
+                    refractory_seconds=args.refractory_seconds,
+                    output_dir=Path(args.output_dir) if args.output_dir else None,
+                    debug_probability=args.debug_probability,
+                ),
             )
         )
     except KeyboardInterrupt:

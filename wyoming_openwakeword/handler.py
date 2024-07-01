@@ -18,6 +18,7 @@ from wyoming.server import AsyncEventHandler
 from wyoming.wake import Detect, Detection, NotDetected
 
 from . import __version__
+from .const import Settings
 
 _LOGGER = logging.getLogger(__name__)
 _WAKE_WORD_WITH_VERSION = re.compile(r"^(.+)_(v[0-9.]+)$")
@@ -29,26 +30,10 @@ _CACHED_MODELS_LOCK = Lock()
 class OpenWakeWordEventHandler(AsyncEventHandler):
     """Event handler for openWakeWord clients."""
 
-    def __init__(
-        self,
-        builtin_models_dir: Path,
-        custom_model_dirs: List[Path],
-        threshold: float,
-        refractory_seconds: float,
-        output_dir: Optional[Path],
-        debug_probability: bool,
-        *args,
-        **kwargs,
-    ) -> None:
+    def __init__(self, settings: Settings, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
-        self.builtin_models_dir = builtin_models_dir
-        self.custom_model_dirs = custom_model_dirs
-        self.threshold = threshold
-        self.output_dir = output_dir
-        self.refractory_seconds = refractory_seconds
-        self.debug_probability = debug_probability
-
+        self.settings = settings
         self.client_id = str(time.monotonic_ns())
 
         # openWakeWord object.
@@ -125,9 +110,9 @@ class OpenWakeWordEventHandler(AsyncEventHandler):
 
             _LOGGER.debug("Receiving audio from client: %s", self.client_id)
 
-            if self.output_dir is not None:
+            if self.settings.output_dir is not None:
                 audio_start = AudioStart.from_event(event)
-                audio_path = Path(self.output_dir) / f"{self.client_id}.wav"
+                audio_path = Path(self.settings.output_dir) / f"{self.client_id}.wav"
                 self.audio_writer = wave.open(str(audio_path), "wb")
                 self.audio_writer.setframerate(audio_start.rate)
                 self.audio_writer.setsampwidth(audio_start.width)
@@ -151,14 +136,14 @@ class OpenWakeWordEventHandler(AsyncEventHandler):
                     continue
 
                 scores = list(self.model.prediction_buffer[model_name])
-                if scores[-1] > self.threshold:
+                if scores[-1] > self.settings.threshold:
                     model_time = self.model_wait_time.get(model_name)
                     if (model_time is not None) and (time.monotonic() < model_time):
                         # Within refractory period
                         continue
 
                     self.model_wait_time[model_name] = (
-                        time.monotonic() + self.refractory_seconds
+                        time.monotonic() + self.settings.refractory_seconds
                     )
                     _LOGGER.debug("Detected: %s", model_name)
                     await self.write_event(
@@ -167,7 +152,7 @@ class OpenWakeWordEventHandler(AsyncEventHandler):
                         ).event()
                     )
 
-                if self.debug_probability:
+                if self.settings.debug_probability:
                     _LOGGER.debug("%s: %s", model_name, scores[-1])
 
         elif AudioStop.is_type(event.type):
@@ -231,11 +216,11 @@ class OpenWakeWordEventHandler(AsyncEventHandler):
     def _get_model_paths(self) -> List[Path]:
         model_paths: List[Path] = [
             p
-            for p in self.builtin_models_dir.glob("*.tflite")
+            for p in self.settings.builtin_models_dir.glob("*.tflite")
             if _WAKE_WORD_WITH_VERSION.match(p.stem)
         ]
 
-        for custom_model_dir in self.custom_model_dirs:
+        for custom_model_dir in self.settings.custom_model_dirs:
             model_paths.extend(custom_model_dir.glob("*.tflite"))
 
         return model_paths
