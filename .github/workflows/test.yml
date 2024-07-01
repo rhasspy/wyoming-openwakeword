@@ -24,8 +24,8 @@ jobs:
         with:
           python-version: "${{ matrix.python_version }}"
           cache: "pip"
-      - run: |
-          test $(script/run --version) = $(cat wyoming_openwakeword/VERSION)
       - run: script/setup --dev
       - run: script/lint
       - run: script/test
+      - run: |
+          test $(script/run --version) = $(cat wyoming_openwakeword/VERSION)
