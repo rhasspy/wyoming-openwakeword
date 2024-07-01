@@ -26,6 +26,8 @@ async def test_openwakeword() -> None:
         "wyoming_openwakeword",
         "--uri",
         "stdio://",
+        "--vad-threshold",
+        "0.5",
         stdin=PIPE,
         stdout=PIPE,
     )

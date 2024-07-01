@@ -7,7 +7,8 @@ from typing import List, Optional
 class Settings:
     builtin_models_dir: Path
     custom_model_dirs: List[Path]
-    threshold: float
+    detection_threshold: float
+    vad_threshold: float
     refractory_seconds: float
     output_dir: Optional[Path]
     debug_probability: bool

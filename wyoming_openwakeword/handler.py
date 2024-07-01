@@ -99,6 +99,7 @@ class OpenWakeWordEventHandler(AsyncEventHandler):
                         embedding_model_path=openwakeword.FEATURE_MODELS["embedding"][
                             "model_path"
                         ],
+                        vad_threshold=self.settings.vad_threshold,
                     )
 
             # Reset
@@ -136,7 +137,7 @@ class OpenWakeWordEventHandler(AsyncEventHandler):
                     continue
 
                 scores = list(self.model.prediction_buffer[model_name])
-                if scores[-1] > self.settings.threshold:
+                if scores[-1] > self.settings.detection_threshold:
                     model_time = self.model_wait_time.get(model_name)
                     if (model_time is not None) and (time.monotonic() < model_time):
                         # Within refractory period

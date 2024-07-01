@@ -43,6 +43,12 @@ async def main() -> None:
         default=0.5,
         help="Seconds before the same wake word can be triggered again",
     )
+    parser.add_argument(
+        "--vad-threshold",
+        type=float,
+        default=0,
+        help="Use Silero VAD model to filter predictions when greater than 0 (default: 0)",
+    )
     #
     parser.add_argument("--debug", action="store_true", help="Log DEBUG messages")
     parser.add_argument(
@@ -77,6 +83,26 @@ async def main() -> None:
 
     models_dir = Path(args.models_dir)
 
+    if args.vad_threshold > 0:
+        _LOGGER.debug("Using Silero VAD (threshold=%s)", args.vad_threshold)
+
+        # Patch VAD path
+        openwakeword.VAD_MODELS["silero_vad"]["model_path"] = str(
+            models_dir / "silero_vad.onnx"
+        )
+
+        # Patch VAD constructor to use configured model path
+        original_vad_init = openwakeword.VAD.__init__
+
+        def new_vad_init(self, **kwargs):
+            original_vad_init(
+                self,
+                model_path=openwakeword.VAD_MODELS["silero_vad"]["model_path"],
+                **kwargs,
+            )
+
+        openwakeword.VAD.__init__ = new_vad_init
+
     # Patch model paths
     for model_dict in (
         openwakeword.FEATURE_MODELS,
@@ -100,7 +126,8 @@ async def main() -> None:
                 Settings(
                     builtin_models_dir=models_dir,
                     custom_model_dirs=[Path(d) for d in args.custom_model_dir],
-                    threshold=args.threshold,
+                    detection_threshold=args.threshold,
+                    vad_threshold=args.vad_threshold,
                     refractory_seconds=args.refractory_seconds,
                     output_dir=Path(args.output_dir) if args.output_dir else None,
                     debug_probability=args.debug_probability,
