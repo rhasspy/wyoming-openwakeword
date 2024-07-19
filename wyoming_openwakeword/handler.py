@@ -10,7 +10,7 @@ from typing import Dict, FrozenSet, List, Optional, Set
 
 import numpy as np
 import wyoming_openwakeword as openwakeword
-from openwakeword.model import Model
+from wyoming_openwakeword.model import Model
 from wyoming.audio import AudioChunk, AudioChunkConverter, AudioStart, AudioStop
 from wyoming.event import Event
 from wyoming.info import Attribution, Describe, Info, WakeModel, WakeProgram
