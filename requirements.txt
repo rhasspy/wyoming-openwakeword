@@ -1,3 +1,3 @@
-openwakeword @ https://github.com/rhasspy/wyoming-openwakeword/archive/refs/heads/fix--handle-event-to-create-model-if-none.tar.gz
+openwakeword @ https://github.com/graimalkin/wyoming-openwakeword/archive/refs/heads/fix--handle-event-to-create-model-if-none.tar.gz
 wyoming==1.5.3
 numpy<2
