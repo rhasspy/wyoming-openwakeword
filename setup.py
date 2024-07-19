@@ -26,7 +26,7 @@ setup(
     name="wyoming_openwakeword",
     version=version,
     description="Wyoming server for openWakeWord",
-    url="http://github.com/rhasspy/wyoming-openwakeword",
+    url="http://github.com/graimalkin/wyoming-openwakeword",
     author="Michael Hansen",
     author_email="mike@rhasspy.org",
     packages=setuptools.find_packages(),
