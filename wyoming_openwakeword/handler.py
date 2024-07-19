@@ -9,7 +9,7 @@ from threading import Lock
 from typing import Dict, FrozenSet, List, Optional, Set
 
 import numpy as np
-from wyoming_openwakeword import openwakeword
+import wyoming_openwakeword as openwakeword
 from openwakeword.model import Model
 from wyoming.audio import AudioChunk, AudioChunkConverter, AudioStart, AudioStop
 from wyoming.event import Event

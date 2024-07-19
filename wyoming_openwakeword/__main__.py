@@ -5,7 +5,7 @@ import logging
 from functools import partial
 from pathlib import Path
 
-from wyoming_openwakeword import openwakeword
+import wyoming_openwakeword as openwakeword
 from wyoming.server import AsyncServer
 
 from . import __version__
