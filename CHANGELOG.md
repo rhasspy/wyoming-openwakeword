@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.10.1
+
+- Handle auto-filled audio
+
 ## 1.10.0
 
 - Upgrade to wyoming 1.5.3
