@@ -67,6 +67,9 @@ class OpenWakeWordEventHandler(AsyncEventHandler):
                         trigger_level=self.cli_args.trigger_level,
                     )
 
+            # Handle auto-filled audio
+            self.state.audio_ready.release()
+
         if Detect.is_type(event.type):
             detect = Detect.from_event(event)
             if detect.names:

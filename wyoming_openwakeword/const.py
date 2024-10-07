@@ -4,7 +4,7 @@ from typing import Dict, Final, Optional, Set, Tuple
 import numpy as np
 from wyoming.server import AsyncEventHandler
 
-_AUTOFILL_SECONDS: Final = 3
+_AUTOFILL_SECONDS: Final = 8
 _MAX_SECONDS: Final = 10
 
 _SAMPLE_RATE: Final = 16000  # 16Khz
