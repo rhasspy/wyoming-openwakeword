@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.10.2
+
+-- change event processing order to most freq to least, use elif, stop looking once you found one.
+-- move buffer init out of event handler, done once
+-- upgrade wyoming to 1.6.0
+
 ## 1.10.1
 
 - Handle auto-filled audio

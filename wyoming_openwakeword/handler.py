@@ -49,13 +49,6 @@ class OpenWakeWordEventHandler(AsyncEventHandler):
 
         _LOGGER.debug("Client connected: %s", self.client_id)
 
-    async def handle_event(self, event: Event) -> bool:
-        if Describe.is_type(event.type):
-            info = self._get_info()
-            await self.write_event(info.event())
-            _LOGGER.debug("Sent info to client: %s", self.client_id)
-            return True
-
         if self.data is None:
             # Create buffers for this client
             self.data = ClientData(self)
@@ -70,41 +63,9 @@ class OpenWakeWordEventHandler(AsyncEventHandler):
             # Handle auto-filled audio
             self.state.audio_ready.release()
 
-        if Detect.is_type(event.type):
-            detect = Detect.from_event(event)
-            if detect.names:
-                ensure_loaded(
-                    self.state,
-                    detect.names,
-                    threshold=self.cli_args.threshold,
-                    trigger_level=self.cli_args.trigger_level,
-                )
+    async def handle_event(self, event: Event) -> bool:
 
-                # Only process audio with these wake word models
-                self.data.wake_word_names = set(
-                    self.state.wake_word_aliases.get(ww_name, ww_name)
-                    for ww_name in detect.names
-                )
-        elif AudioStart.is_type(event.type):
-            # Reset
-            for ww_data in self.data.wake_words.values():
-                ww_data.is_detected = False
-
-            with self.state.audio_lock:
-                self.data.reset()
-
-            _LOGGER.debug("Receiving audio from client: %s", self.client_id)
-
-            if self.cli_args.output_dir is not None:
-                audio_start = AudioStart.from_event(event)
-                audio_path = Path(self.cli_args.output_dir) / f"{self.client_id}.wav"
-                self.audio_writer = wave.open(str(audio_path), "wb")
-                self.audio_writer.setframerate(audio_start.rate)
-                self.audio_writer.setsampwidth(audio_start.width)
-                self.audio_writer.setnchannels(audio_start.channels)
-                _LOGGER.debug("Saving audio to %s", audio_path)
-
-        elif AudioChunk.is_type(event.type):
+        if AudioChunk.is_type(event.type):
             # Add to audio buffer and signal mels thread
             chunk = self.converter.convert(AudioChunk.from_event(event))
 
@@ -130,6 +91,7 @@ class OpenWakeWordEventHandler(AsyncEventHandler):
 
             # Signal mels thread that audio is ready to process
             self.state.audio_ready.release()
+
         elif AudioStop.is_type(event.type):
             # Inform client if no detections occurred
             while True:
@@ -161,6 +123,47 @@ class OpenWakeWordEventHandler(AsyncEventHandler):
             if self.audio_writer is not None:
                 self.audio_writer.close()
                 self.audio_writer = None
+
+        elif AudioStart.is_type(event.type):
+            # Reset
+            for ww_data in self.data.wake_words.values():
+                ww_data.is_detected = False
+
+            with self.state.audio_lock:
+                self.data.reset()
+
+            _LOGGER.debug("Receiving audio from client: %s", self.client_id)
+
+            if self.cli_args.output_dir is not None:
+                audio_start = AudioStart.from_event(event)
+                audio_path = Path(self.cli_args.output_dir) / f"{self.client_id}.wav"
+                self.audio_writer = wave.open(str(audio_path), "wb")
+                self.audio_writer.setframerate(audio_start.rate)
+                self.audio_writer.setsampwidth(audio_start.width)
+                self.audio_writer.setnchannels(audio_start.channels)
+                _LOGGER.debug("Saving audio to %s", audio_path)
+
+        elif Detect.is_type(event.type):
+            detect = Detect.from_event(event)
+            if detect.names:
+                ensure_loaded(
+                    self.state,
+                    detect.names,
+                    threshold=self.cli_args.threshold,
+                    trigger_level=self.cli_args.trigger_level,
+                )
+
+                # Only process audio with these wake word models
+                self.data.wake_word_names = set(
+                    self.state.wake_word_aliases.get(ww_name, ww_name)
+                    for ww_name in detect.names
+                )
+
+        elif Describe.is_type(event.type):
+            info = self._get_info()
+            await self.write_event(info.event())
+            _LOGGER.debug("Sent info to client: %s", self.client_id)
+
         else:
             _LOGGER.debug("Unexpected event: type=%s, data=%s", event.type, event.data)
 
