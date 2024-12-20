@@ -26,9 +26,10 @@ async def test_openwakeword() -> None:
         "wyoming_openwakeword",
         "--uri",
         "stdio://",
+        "--vad-threshold",
+        "0.5",
         stdin=PIPE,
         stdout=PIPE,
-        stderr=PIPE,
     )
     assert proc.stdin is not None
     assert proc.stdout is not None
@@ -58,7 +59,7 @@ async def test_openwakeword() -> None:
                 model_found = True
                 break
 
-        assert model_found, "Expected 'ok nabu' model"
+        assert model_found, f"Expected 'ok nabu' model in {wake.models}"
         break
 
     # We want to use the 'ok nabu' model
