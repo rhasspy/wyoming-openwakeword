@@ -1,4 +1,4 @@
-FROM python:3.11.11-slim
+FROM nvidia/cuda:12.6.3-cudnn-runtime-ubuntu22.04
 
 ENV UV_COMPILE_BYTECODE=1
 
@@ -16,4 +16,4 @@ ADD . /app
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen
 
-EXPOSE 10400
+EXPOSE 10700
