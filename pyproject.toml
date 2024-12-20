@@ -60,3 +60,7 @@ indent = "    "
 [tool.flake8]
 max-line-length = 88
 ignore = ["E501", "W503", "E203", "D202", "W504"]
+
+[[tool.mypy.overrides]]
+module = ["wyoming.*"]
+ignore_missing_imports = true
