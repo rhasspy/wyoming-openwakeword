@@ -1,0 +1,60 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wyoming_openwakeword"
+dynamic = ["version"]
+description = "Wyoming server for openWakeWord"
+authors = [{ name = "Michael Hansen", email = "mike@rhasspy.org" }]
+license = { text = "Apache Software License" }
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+keywords = ["rhasspy", "wyoming", "openwakeword"]
+urls = { Homepage = "http://github.com/rhasspy/wyoming-openwakeword" }
+requires-python = ">=3.8.1,<3.12"
+dependencies = ["tflite-runtime", "wyoming==1.5.3", "numpy<2"]
+
+[project.optional-dependencies]
+dev = [
+    "black==22.12.0",
+    "flake8==6.0.0",
+    "isort==5.11.3",
+    "mypy==0.991",
+    "pylint==2.15.9",
+    "pytest==7.4.4",
+    "pytest-asyncio==0.23.3",
+    "tox==4.13.0",
+]
+
+[tool.setuptools]
+packages = ["wyoming_openwakeword"]
+
+[tool.setuptools.package-data]
+"wyoming_openwakeword" = ["models/*.tflite", "VERSION"]
+
+[project.scripts]
+wyoming-openwakeword = "wyoming_openwakeword.__main__:run"
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+line_length = 88
+indent = "    "
+
+[tool.flake8]
+max-line-length = 88
+ignore = ["E501", "W503", "E203", "D202", "W504"]
+
+[tool.uv]
+dev-dependencies = ["ruff>=0.8.4"]

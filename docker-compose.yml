@@ -1,0 +1,9 @@
+services:
+  openwakeword:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: [ "uv", "run", "wyoming-openwakeword", "--uri", "tcp://0.0.0.0:10700" ]
+    restart: unless-stopped
+    ports:
+      - 10700:10700
