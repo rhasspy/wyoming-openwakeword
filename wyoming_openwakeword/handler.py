@@ -72,7 +72,6 @@ class OpenWakeWordEventHandler(AsyncEventHandler):
             _LOGGER.debug("Sent info to client: %s", self.client_id)
             return True
 
-
         if Detect.is_type(event.type):
             detect = Detect.from_event(event)
             if detect.names:
