@@ -1,4 +1,5 @@
 """Event handler for clients of the server."""
+
 import argparse
 import asyncio
 import logging
@@ -50,6 +51,7 @@ class OpenWakeWordEventHandler(AsyncEventHandler):
         _LOGGER.debug("Client connected: %s", self.client_id)
 
     async def handle_event(self, event: Event) -> bool:
+        _LOGGER.debug("Received event: type=%s, data=%s", event.type, event.data)
         if Describe.is_type(event.type):
             info = self._get_info()
             await self.write_event(info.event())
@@ -159,6 +161,7 @@ class OpenWakeWordEventHandler(AsyncEventHandler):
                 )
 
             if self.audio_writer is not None:
+                _LOGGER.debug("Closing audio writer")
                 self.audio_writer.close()
                 self.audio_writer = None
         else:
