@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    command: [ "uv", "run", "wyoming-openwakeword", "--uri", "tcp://0.0.0.0:10400", "--output-dir", "/output-clips", "--preload-models", "hey_jarvis", "--debug" ]
+    command: [ "uv", "run", "wyoming-openwakeword", "--uri", "tcp://0.0.0.0:10400", "--output-dir", "/output-clips"]
     restart: unless-stopped
     ports:
       - 10400:10400
