@@ -65,6 +65,46 @@ class OpenWakeWordEventHandler(AsyncEventHandler):
 
         _LOGGER.debug("Client connected: %s", self.client_id)
 
+    def init_model(self):
+        # Try to load from cache first
+        wakeword_models = [str(p) for p in self._get_wakeword_model_paths()]
+        self.model_cache_key = frozenset(wakeword_models)
+        with _CACHED_MODELS_LOCK:
+            cached_models = _CACHED_MODELS.get(self.model_cache_key)
+            if cached_models:
+                self.model = cached_models.pop()
+
+        if self.model is None:
+            # Load openWakeWord models
+            _LOGGER.debug("Loading openWakeWord models: %s", wakeword_models)
+            self.model = Model(
+                wakeword_models=wakeword_models,
+                inference_framework="tflite",
+                melspec_model_path=openwakeword.FEATURE_MODELS[
+                    "melspectrogram"
+                ]["model_path"],
+                embedding_model_path=openwakeword.FEATURE_MODELS["embedding"][
+                    "model_path"
+                ],
+                vad_threshold=self.settings.vad_threshold,
+            )
+
+    def reset_model(self):
+        if self.model is not None:
+            self.model.reset()
+
+        # Reset
+        self.last_timestamp = None
+        self.has_detections = False
+        self.detect_names.clear()
+        self.model_wait_time.clear()
+
+        _LOGGER.debug("Receiving audio from client: %s", self.client_id)
+
+        if self.audio_writer is not None:
+            self.audio_writer.close()
+            self.audio_writer = None
+
     async def handle_event(self, event: Event) -> bool:
         _LOGGER.debug("Received event: type=%s, data=%s", event.type, event.data)
         if Describe.is_type(event.type):
@@ -81,35 +121,10 @@ class OpenWakeWordEventHandler(AsyncEventHandler):
                 self.detect_names.update(detect.names)
         elif AudioStart.is_type(event.type):
             if self.model is None:
-                # Try to load from cache first
-                wakeword_models = [str(p) for p in self._get_wakeword_model_paths()]
-                self.model_cache_key = frozenset(wakeword_models)
-                with _CACHED_MODELS_LOCK:
-                    cached_models = _CACHED_MODELS.get(self.model_cache_key)
-                    if cached_models:
-                        self.model = cached_models.pop()
-
-                if self.model is None:
-                    # Load openWakeWord models
-                    _LOGGER.debug("Loading openWakeWord models: %s", wakeword_models)
-                    self.model = Model(
-                        wakeword_models=wakeword_models,
-                        inference_framework="tflite",
-                        melspec_model_path=openwakeword.FEATURE_MODELS[
-                            "melspectrogram"
-                        ]["model_path"],
-                        embedding_model_path=openwakeword.FEATURE_MODELS["embedding"][
-                            "model_path"
-                        ],
-                        vad_threshold=self.settings.vad_threshold,
-                    )
+                self.init_model()
 
             # Reset
-            self.model.reset()
-            self.last_timestamp = None
-            self.has_detections = False
-            self.detect_names.clear()
-            self.model_wait_time.clear()
+            self.reset_model()
 
             _LOGGER.debug("Receiving audio from client: %s", self.client_id)
 
@@ -123,7 +138,12 @@ class OpenWakeWordEventHandler(AsyncEventHandler):
                 _LOGGER.debug("Saving audio to %s", audio_path)
 
         elif AudioChunk.is_type(event.type):
+            if self.model is None:
+                self.init_model()
+                self.reset_model()
             assert self.model is not None
+
+
             chunk = self.converter.convert(AudioChunk.from_event(event))
             self.last_timestamp = chunk.timestamp
 
