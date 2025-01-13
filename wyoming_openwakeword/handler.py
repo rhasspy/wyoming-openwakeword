@@ -80,9 +80,9 @@ class OpenWakeWordEventHandler(AsyncEventHandler):
             self.model = Model(
                 wakeword_models=wakeword_models,
                 inference_framework="tflite",
-                melspec_model_path=openwakeword.FEATURE_MODELS[
-                    "melspectrogram"
-                ]["model_path"],
+                melspec_model_path=openwakeword.FEATURE_MODELS["melspectrogram"][
+                    "model_path"
+                ],
                 embedding_model_path=openwakeword.FEATURE_MODELS["embedding"][
                     "model_path"
                 ],
@@ -113,7 +113,6 @@ class OpenWakeWordEventHandler(AsyncEventHandler):
             _LOGGER.debug("Sent info to client: %s", self.client_id)
             return True
 
-
         if Detect.is_type(event.type):
             detect = Detect.from_event(event)
             if detect.names:
@@ -142,7 +141,6 @@ class OpenWakeWordEventHandler(AsyncEventHandler):
                 self.init_model()
                 self.reset_model()
             assert self.model is not None
-
 
             chunk = self.converter.convert(AudioChunk.from_event(event))
             self.last_timestamp = chunk.timestamp
