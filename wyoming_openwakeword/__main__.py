@@ -120,19 +120,21 @@ async def main() -> None:
     server = AsyncServer.from_uri(args.uri)
 
     try:
+        settings = Settings(
+            builtin_models_dir=models_dir,
+            custom_model_dirs=[Path(d) for d in args.custom_model_dir],
+            detection_threshold=args.threshold,
+            vad_threshold=args.vad_threshold,
+            refractory_seconds=args.refractory_seconds,
+            output_dir=Path(args.output_dir) if args.output_dir else None,
+            debug_probability=args.debug_probability,
+        )
+        _LOGGER.info("Settings: %s", settings)
         await server.run(
             partial(
                 OpenWakeWordEventHandler,
-                Settings(
-                    builtin_models_dir=models_dir,
-                    custom_model_dirs=[Path(d) for d in args.custom_model_dir],
-                    detection_threshold=args.threshold,
-                    vad_threshold=args.vad_threshold,
-                    refractory_seconds=args.refractory_seconds,
-                    output_dir=Path(args.output_dir) if args.output_dir else None,
-                    debug_probability=args.debug_probability,
-                ),
-            )
+                settings=settings,
+            ),
         )
     except KeyboardInterrupt:
         pass

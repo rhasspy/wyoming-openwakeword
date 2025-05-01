@@ -1,3 +1,0 @@
-openwakeword==0.6.0
-wyoming==1.5.3
-numpy<2

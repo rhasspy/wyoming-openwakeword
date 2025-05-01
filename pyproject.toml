@@ -1,7 +1,3 @@
-[build-system]
-requires = ["setuptools>=42", "wheel"]
-build-backend = "setuptools.build_meta"
-
 [project]
 name = "wyoming_openwakeword"
 dynamic = ["version"]
@@ -27,6 +23,10 @@ dependencies = [
     "openwakeword>=0.6.0",
 ]
 
+[build-system]
+requires = ["setuptools>=80", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project.optional-dependencies]
 dev = [
     "black==22.12.0",
@@ -39,8 +39,9 @@ dev = [
     "tox==4.13.0",
 ]
 
-[tool.setuptools]
-packages = ["wyoming_openwakeword"]
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["wyoming_openwakeword"]
 
 [tool.setuptools.package-data]
 "wyoming_openwakeword" = ["models/*.tflite", "VERSION"]
