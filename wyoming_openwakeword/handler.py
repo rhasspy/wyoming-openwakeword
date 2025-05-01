@@ -1,4 +1,5 @@
 """Event handler for clients of the server."""
+
 import logging
 import re
 import time
@@ -30,7 +31,7 @@ _CACHED_MODELS_LOCK = Lock()
 class OpenWakeWordEventHandler(AsyncEventHandler):
     """Event handler for openWakeWord clients."""
 
-    def __init__(self, settings: Settings, *args, **kwargs) -> None:
+    def __init__(self, *args, settings: Settings, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
         self.settings = settings
