@@ -5,10 +5,12 @@ from typing import Dict, List, Optional, TextIO
 
 import numpy as np
 
-try:
-    import tflite_runtime.interpreter as tflite
-except ModuleNotFoundError:
-    import tensorflow.lite as tflite
+from ai_edge_litert.interpreter import Interpreter as LiteRTInterpreter
+
+class TFLiteWrapper:
+    Interpreter = LiteRTInterpreter
+
+tflite = TFLiteWrapper()
 from wyoming.wake import Detection
 
 from .const import (

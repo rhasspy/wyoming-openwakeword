@@ -1,3 +1,3 @@
-tflite-runtime
 wyoming==1.5.3
 numpy<2
+ai-edge-litert==1.3.0
