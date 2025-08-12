@@ -47,13 +47,16 @@ docker run -it -p 10400:10400 -v /path/to/custom/models:/custom rhasspy/wyoming-
     --custom-model-dir /custom
 ```
 
-### Docker Compose
+## Docker Compose
 ```
 services:
   wyoming-openwakeword:
-    image: rhasspy/wyoming-openwakeword
+    image: docker.io/rhasspy/wyoming-openwakeword
     container_name: wyoming-openwakeword
     command:
+      # Uncomment the below lines to set a static URI (default is to listen on all interfaces). [DO NOT MERGE! This section is not finished and will change]
+      # - --uri
+      # - 'tcp://<your satellite's IP>:10400'
       - --preload-model
       - 'ok_nabu' # Change this to a supported wake word. Supported wake words include ok_nabu, hey_jarvis, alexa, hey_mycroft and hey_rhasspy.
       # Uncomment the below lines to use a custom wake word. You can find custom wake words at https://github.com/fwartner/home-assistant-wakewords-collection.
