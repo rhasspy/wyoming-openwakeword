@@ -47,7 +47,7 @@ docker run -it -p 10400:10400 -v /path/to/custom/models:/custom rhasspy/wyoming-
     --custom-model-dir /custom
 ```
 
-## Docker Compose
+### Docker Compose
 ```
 services:
   wyoming-openwakeword:
