@@ -142,6 +142,9 @@ class OpenWakeWordEventHandler(AsyncEventHandler):
                                 name=detector.id, timestamp=self.audio_timestamp
                             ).event()
                         )
+                        _LOGGER.debug(
+                            "Detected %s at %s", detector.id, self.audio_timestamp
+                        )
 
             self.audio_timestamp += chunk.milliseconds
         elif AudioStop.is_type(event.type):

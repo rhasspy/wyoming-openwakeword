@@ -2,6 +2,7 @@
 import argparse
 import asyncio
 import logging
+import re
 from functools import partial
 from pathlib import Path
 
@@ -12,6 +13,7 @@ from .handler import OpenWakeWordEventHandler
 from .state import State
 
 _LOGGER = logging.getLogger()
+_NAME_VERSION = re.compile(r"^([^_]+)_v[0-9.]+$")
 
 
 async def main() -> None:
@@ -79,10 +81,16 @@ async def main() -> None:
         custom_model_dir = Path(custom_model_dir_str)
         for model_path in custom_model_dir.glob("*.tflite"):
             model_id = model_path.stem
+            name_match = _NAME_VERSION.match(model_id)
+            if name_match:
+                # Remove version
+                model_id = name_match.group(1)
+
             if model_id in state.custom_models:
                 continue
 
             state.custom_models[model_id] = model_path
+            _LOGGER.debug("Found custom model %s at %s", model_id, model_path)
 
     _LOGGER.info("Ready")
 

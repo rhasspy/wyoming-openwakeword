@@ -3,6 +3,9 @@
 ## 2.0.0
 
 - Use [pyopen-wakeword](https://github.com/rhasspy/pyopen-wakeword/)
+- Transition to `pyproject.toml`
+- Upgrade to wyoming 1.8
+- Rename `ok_nabu` to `okay_nabu` to match microWakeWord
 - Remove `--models-dir`
 - Remove `--preload-model`
 - Remove `--output-dir`

@@ -28,22 +28,22 @@ script/run --uri 'tcp://0.0.0.0:10400'
 
 See `script/run --help` for more options, including:
 
-* `--custom-model-dir <DIR>` - look for custom wake word models in `<DIR>`
+* `--custom-model-dir <DIR>` - look for custom wake word models (`.tflite`) in `<DIR>`
 * `--debug` - print lots of information to console
 
 
 ## Docker Image
 
 ``` sh
-docker run -it -p 10400:10400 rhasspy/wyoming-openwakeword \
-    --preload-model 'ok_nabu'
+docker run -it -p 10400:10400 rhasspy/wyoming-openwakeword
 ```
 
 ### Custom Models
 
+Download [custom wake words](https://github.com/fwartner/home-assistant-wakewords-collection) and put the `.tflite` files in a directory:
+
 ```sh
 docker run -it -p 10400:10400 -v /path/to/custom/models:/custom rhasspy/wyoming-openwakeword \
-    --preload-model 'ok_nabu' \
     --custom-model-dir /custom
 ```
 
