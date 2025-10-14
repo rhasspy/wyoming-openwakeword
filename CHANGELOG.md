@@ -12,6 +12,7 @@
 - Remove `--debug-probability`
 - Add `--refractory-seconds`
 - Add `--zeroconf`
+- Publish PyPI package and Docker image from here
 
 ## 1.10.1
 
