@@ -1,0 +1,4 @@
+*
+!wyoming_openwakeword/*.py
+!pyproject.toml
+!docker_run.sh

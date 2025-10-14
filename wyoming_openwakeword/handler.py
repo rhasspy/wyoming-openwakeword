@@ -68,8 +68,14 @@ class OpenWakeWordEventHandler(AsyncEventHandler):
             ww_names = set()
             if detect.names:
                 for ww_name in detect.names:
-                    if (ww_name in self.state.custom_models) or (ww_name in Model):
+                    if ww_name in self.state.custom_models:
                         ww_names.add(ww_name)
+                    else:
+                        try:
+                            model = Model(ww_name)
+                            ww_names.add(ww_name)
+                        except ValueError:
+                            continue
 
             if not ww_names:
                 ww_names.add(DEFAULT_MODEL.value)
