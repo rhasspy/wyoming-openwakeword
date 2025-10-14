@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name        = "wyoming-openwakeword"
+version     = "2.0.0"
+license     = {text = "Apache-2.0"}
+description = "Wyoming server for openWakeWord"
+readme      = "README.md"
+authors     = [
+    {name = "Michael Hansen", email = "mike@rhasspy.org"}
+]
+keywords    = ["wakeword", "detection", "hotword"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Topic :: Multimedia :: Sound/Audio :: Speech",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+requires-python = ">=3.9.0"
+dependencies = [
+    "pyopen-wakeword>=1,<2",
+    "wyoming>=1.8,<2",
+]
+
+[project.urls]
+"Source Code" = "http://github.com/rhasspy/wyoming-openwakeword"
+
+[tool.setuptools]
+platforms = ["any"]
+zip-safe  = false
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["wyoming_openwakeword"]
+exclude = ["tests", "tests.*"]
+
+[project.optional-dependencies]
+dev = [
+    "black",
+    "flake8",
+    "isort",
+    "mypy",
+    "pylint",
+    "pytest",
+    "pytest-asyncio",
+    "build",
+]

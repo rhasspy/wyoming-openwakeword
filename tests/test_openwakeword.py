@@ -51,21 +51,21 @@ async def test_openwakeword() -> None:
 
         model_found = False
         for ww_model in wake.models:
-            if ww_model.name == "ok_nabu_v0.1":
-                assert ww_model.description == "ok nabu"
-                assert ww_model.phrase == "ok nabu"
+            if ww_model.name == "okay_nabu":
+                assert ww_model.description == "Okay Nabu"
+                assert ww_model.phrase == "Okay Nabu"
                 assert ww_model.version == "v0.1"
                 model_found = True
                 break
 
-        assert model_found, "Expected 'ok nabu' model"
+        assert model_found, "Expected 'okay nabu' model"
         break
 
-    # We want to use the 'ok nabu' model
-    await async_write_event(Detect(names=["ok_nabu_v0.1"]).event(), proc.stdin)
+    # We want to use the 'okay nabu' model
+    await async_write_event(Detect(names=["okay_nabu"]).event(), proc.stdin)
 
     # Test positive WAV
-    with wave.open(str(_DIR / "ok_nabu.wav"), "rb") as ok_nabu_wav:
+    with wave.open(str(_DIR / "okay_nabu.wav"), "rb") as ok_nabu_wav:
         await async_write_event(
             AudioStart(
                 rate=ok_nabu_wav.getframerate(),
@@ -92,7 +92,7 @@ async def test_openwakeword() -> None:
             continue
 
         detection = Detection.from_event(event)
-        assert detection.name == "ok_nabu_v0.1"  # success
+        assert detection.name == "okay_nabu"  # success
         break
 
     # Test negative WAV

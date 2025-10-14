@@ -1,3 +1,0 @@
-tflite-runtime
-wyoming==1.5.3
-numpy<2

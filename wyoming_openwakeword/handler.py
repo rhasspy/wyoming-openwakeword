@@ -1,28 +1,32 @@
 """Event handler for clients of the server."""
-import argparse
-import asyncio
-import logging
-import re
-import time
-import wave
-from pathlib import Path
-from threading import Thread
-from typing import List, Optional
 
-import numpy as np
+import logging
+import time
+from dataclasses import dataclass
+from typing import Dict, List, Optional
+
+from pyopen_wakeword import Model, OpenWakeWord, OpenWakeWordFeatures
 from wyoming.audio import AudioChunk, AudioChunkConverter, AudioStart, AudioStop
 from wyoming.event import Event
 from wyoming.info import Attribution, Describe, Info, WakeModel, WakeProgram
 from wyoming.server import AsyncEventHandler
-from wyoming.wake import Detect, NotDetected
+from wyoming.wake import Detect, Detection, NotDetected
 
 from . import __version__
-from .const import EMB_FEATURES, MEL_SAMPLES, ClientData, WakeWordData
-from .openwakeword import ww_proc
-from .state import State, WakeWordState
+from .state import State
 
 _LOGGER = logging.getLogger(__name__)
-_WAKE_WORD_WITH_VERSION = re.compile(r"^(.+)_(v[0-9.]+)$")
+
+DEFAULT_MODEL = Model.OKAY_NABU
+
+
+@dataclass
+class Detector:
+    id: str
+    oww_model: OpenWakeWord
+    triggers_left: int
+    is_detected: bool = False
+    last_triggered: Optional[float] = None
 
 
 class OpenWakeWordEventHandler(AsyncEventHandler):
@@ -30,22 +34,25 @@ class OpenWakeWordEventHandler(AsyncEventHandler):
 
     def __init__(
         self,
-        cli_args: argparse.Namespace,
+        threshold: float,
+        trigger_level: int,
+        refractory_seconds: float,
         state: State,
         *args,
         **kwargs,
     ) -> None:
         super().__init__(*args, **kwargs)
 
-        self.cli_args = cli_args
         self.client_id = str(time.monotonic_ns())
+        self.threshold = threshold
+        self.trigger_level = trigger_level
+        self.refractory_seconds = refractory_seconds
         self.state = state
-        self.data: Optional[ClientData] = None
         self.converter = AudioChunkConverter(rate=16000, width=2, channels=1)
+        self.oww_features = OpenWakeWordFeatures.from_builtin()
         self.audio_buffer = bytes()
-
-        # Only used when output_dir is set
-        self.audio_writer: Optional[wave.Wave_write] = None
+        self.detectors: Dict[str, Detector] = {}
+        self.audio_timestamp = 0
 
         _LOGGER.debug("Client connected: %s", self.client_id)
 
@@ -56,111 +63,96 @@ class OpenWakeWordEventHandler(AsyncEventHandler):
             _LOGGER.debug("Sent info to client: %s", self.client_id)
             return True
 
-        if self.data is None:
-            # Create buffers for this client
-            self.data = ClientData(self)
-            with self.state.clients_lock:
-                self.state.clients[self.client_id] = self.data
-                for ww_name in self.state.wake_words:
-                    self.data.wake_words[ww_name] = WakeWordData(
-                        threshold=self.cli_args.threshold,
-                        trigger_level=self.cli_args.trigger_level,
-                    )
-
-            # Handle auto-filled audio
-            self.state.audio_ready.release()
-
         if Detect.is_type(event.type):
             detect = Detect.from_event(event)
+            ww_names = set()
             if detect.names:
-                ensure_loaded(
-                    self.state,
-                    detect.names,
-                    threshold=self.cli_args.threshold,
-                    trigger_level=self.cli_args.trigger_level,
+                for ww_name in detect.names:
+                    if (ww_name in self.state.custom_models) or (ww_name in Model):
+                        ww_names.add(ww_name)
+
+            if not ww_names:
+                ww_names.add(DEFAULT_MODEL.value)
+
+            for ww_name in ww_names:
+                if ww_name in self.detectors:
+                    continue
+
+                oww_model: Optional[OpenWakeWord] = None
+                model_path = self.state.custom_models.get(ww_name)
+                if model_path is not None:
+                    oww_model = OpenWakeWord.from_model(model_path)
+                else:
+                    try:
+                        model = Model(ww_name)
+                        oww_model = OpenWakeWord.from_builtin(model)
+                    except ValueError:
+                        pass
+
+                if not oww_model:
+                    continue
+
+                self.detectors[ww_name] = Detector(
+                    id=ww_name,
+                    oww_model=oww_model,
+                    triggers_left=self.trigger_level,
                 )
 
-                # Only process audio with these wake word models
-                self.data.wake_word_names = set(
-                    self.state.wake_word_aliases.get(ww_name, ww_name)
-                    for ww_name in detect.names
-                )
+            # Remove unnecessary detectors
+            for other_ww_name in set(self.detectors.keys()) - ww_names:
+                self.detectors.pop(other_ww_name)
+
+            _LOGGER.debug("Loaded models: %s", list(self.detectors.keys()))
         elif AudioStart.is_type(event.type):
-            # Reset
-            for ww_data in self.data.wake_words.values():
-                ww_data.is_detected = False
-
-            with self.state.audio_lock:
-                self.data.reset()
-
             _LOGGER.debug("Receiving audio from client: %s", self.client_id)
 
-            if self.cli_args.output_dir is not None:
-                audio_start = AudioStart.from_event(event)
-                audio_path = Path(self.cli_args.output_dir) / f"{self.client_id}.wav"
-                self.audio_writer = wave.open(str(audio_path), "wb")
-                self.audio_writer.setframerate(audio_start.rate)
-                self.audio_writer.setsampwidth(audio_start.width)
-                self.audio_writer.setnchannels(audio_start.channels)
-                _LOGGER.debug("Saving audio to %s", audio_path)
-
+            # Reset
+            self.audio_timestamp = 0
+            self.oww_features.reset()
+            for detector in self.detectors.values():
+                detector.is_detected = False
+                detector.triggers_left = self.trigger_level
+                detector.last_triggered = None
+                detector.oww_model.reset()
         elif AudioChunk.is_type(event.type):
-            # Add to audio buffer and signal mels thread
             chunk = self.converter.convert(AudioChunk.from_event(event))
+            for features in self.oww_features.process_streaming(chunk.audio):
+                for detector in self.detectors.values():
+                    skip_detector = (detector.last_triggered is not None) and (
+                        (time.monotonic() - detector.last_triggered)
+                        < self.refractory_seconds
+                    )
 
-            if self.audio_writer is not None:
-                self.audio_writer.writeframes(chunk.audio)
+                    # Still need to process features even if we skip detection
+                    for prob in detector.oww_model.process_streaming(features):
+                        if skip_detector:
+                            continue
 
-            chunk_array = np.frombuffer(chunk.audio, dtype=np.int16).astype(np.float32)
+                        if prob <= self.threshold:
+                            continue
 
-            with self.state.audio_lock:
-                # Shift samples left
-                self.data.audio[: -len(chunk_array)] = self.data.audio[
-                    len(chunk_array) :
-                ]
+                        detector.triggers_left -= 1
+                        if detector.triggers_left > 0:
+                            continue
 
-                # Add new samples to end
-                self.data.audio[-len(chunk_array) :] = chunk_array
-                self.data.new_audio_samples = min(
-                    len(self.data.audio),
-                    self.data.new_audio_samples + len(chunk_array),
-                )
+                        detector.is_detected = True
+                        detector.last_triggered = time.monotonic()
+                        await self.write_event(
+                            Detection(
+                                name=detector.id, timestamp=self.audio_timestamp
+                            ).event()
+                        )
 
-                self.data.audio_timestamp = chunk.timestamp or time.monotonic_ns()
-
-            # Signal mels thread that audio is ready to process
-            self.state.audio_ready.release()
+            self.audio_timestamp += chunk.milliseconds
         elif AudioStop.is_type(event.type):
             # Inform client if no detections occurred
-            while True:
-                if (
-                    (self.data.new_audio_samples < MEL_SAMPLES)
-                    and (self.data.new_mels < EMB_FEATURES)
-                    and all(
-                        (ww_data.ww_windows is not None)
-                        and (ww_data.new_embeddings < ww_data.ww_windows)
-                        and (not ww_data.is_processing)
-                        for ww_data in self.data.wake_words.values()
-                    )
-                ):
-                    break
-
-                # Wait until no new embeddings still need to be processed
-                await asyncio.sleep(0.1)
-
-            if not any(
-                ww_data.is_detected for ww_data in self.data.wake_words.values()
-            ):
+            if not any(detector.is_detected for detector in self.detectors.values()):
                 # No wake word detections
                 await self.write_event(NotDetected().event())
 
                 _LOGGER.debug(
                     "Audio stopped without detection from client: %s", self.client_id
                 )
-
-            if self.audio_writer is not None:
-                self.audio_writer.close()
-                self.audio_writer = None
         else:
             _LOGGER.debug("Unexpected event: type=%s, data=%s", event.type, event.data)
 
@@ -169,17 +161,42 @@ class OpenWakeWordEventHandler(AsyncEventHandler):
     async def disconnect(self) -> None:
         _LOGGER.debug("Client disconnected: %s", self.client_id)
 
-        if self.audio_writer is not None:
-            self.audio_writer.close()
-            self.audio_writer = None
-
-        if self.data is None:
-            return
-
-        with self.state.clients_lock:
-            self.state.clients.pop(self.client_id, None)
-
     def _get_info(self) -> Info:
+        models: List[WakeModel] = []
+        for model in Model:
+            phrase = _get_phrase(model.value)
+            models.append(
+                WakeModel(
+                    name=model.value,
+                    description=phrase,
+                    phrase=phrase,
+                    attribution=Attribution(
+                        name="dscripka",
+                        url="https://github.com/dscripka/openWakeWord",
+                    ),
+                    installed=True,
+                    languages=["en"],
+                    version="v0.1",
+                )
+            )
+
+        for custom_model in self.state.custom_models:
+            phrase = _get_phrase(custom_model)
+            models.append(
+                WakeModel(
+                    name=custom_model,
+                    description=phrase,
+                    phrase=phrase,
+                    attribution=Attribution(
+                        name="",
+                        url="",
+                    ),
+                    installed=True,
+                    languages=[],
+                    version="",
+                )
+            )
+
         return Info(
             wake=[
                 WakeProgram(
@@ -190,118 +207,13 @@ class OpenWakeWordEventHandler(AsyncEventHandler):
                     ),
                     installed=True,
                     version=__version__,
-                    models=[
-                        WakeModel(
-                            name=model_path.stem,
-                            # hey_jarvis_v0.1 => hey jarvis
-                            description=_get_description(model_path.stem),
-                            phrase=_get_description(model_path.stem),
-                            attribution=Attribution(
-                                name="dscripka",
-                                url="https://github.com/dscripka/openWakeWord",
-                            ),
-                            installed=True,
-                            languages=[],
-                            version=_get_version(model_path.stem),
-                        )
-                        for model_path in _get_wake_word_files(self.state)
-                    ],
+                    models=models,
                 )
             ],
         )
 
 
-# -----------------------------------------------------------------------------
-
-
-def ensure_loaded(state: State, names: List[str], threshold: float, trigger_level: int):
-    """Ensure wake words are loaded by name."""
-    with state.clients_lock, state.ww_threads_lock:
-        for model_name in names:
-            norm_model_name = _normalize_key(model_name)
-
-            ww_state = state.wake_words.get(model_name)
-            if ww_state is not None:
-                # Already loaded
-                continue
-
-            model_paths = _get_wake_word_files(state)
-            model_path: Optional[Path] = None
-            for maybe_model_path in model_paths:
-                if norm_model_name == _normalize_key(maybe_model_path.stem):
-                    # Exact match
-                    model_path = maybe_model_path
-                    break
-
-                if match := _WAKE_WORD_WITH_VERSION.match(maybe_model_path.stem):
-                    # Exclude version
-                    if norm_model_name == _normalize_key(match.group(1)):
-                        model_path = maybe_model_path
-                        state.wake_word_aliases[model_name] = model_path.stem
-                        break
-
-            if model_path is None:
-                raise ValueError(f"Wake word model not found: {model_name}")
-
-            # Start thread for model
-            model_key = model_path.stem
-            state.wake_words[model_key] = WakeWordState()
-            state.ww_threads[model_key] = Thread(
-                target=ww_proc,
-                daemon=True,
-                args=(
-                    state,
-                    model_key,
-                    model_path,
-                    asyncio.get_running_loop(),
-                ),
-            )
-            state.ww_threads[model_key].start()
-
-            for client_data in state.clients.values():
-                client_data.wake_words[model_key] = WakeWordData(
-                    threshold=threshold,
-                    trigger_level=trigger_level,
-                )
-
-            _LOGGER.debug("Started thread for %s", model_key)
-
-
-# -----------------------------------------------------------------------------
-
-
-def _get_wake_word_files(state: State) -> List[Path]:
-    """Get paths to all available wake word model files."""
-    model_paths = [
-        p
-        for p in state.models_dir.glob("*.tflite")
-        if _WAKE_WORD_WITH_VERSION.match(p.stem)
-    ]
-
-    for custom_model_dir in state.custom_model_dirs:
-        model_paths.extend(custom_model_dir.glob("*.tflite"))
-
-    return model_paths
-
-
-def _normalize_key(model_key: str) -> str:
-    """Normalize model key for comparison."""
-    return model_key.lower().replace("_", " ").strip()
-
-
-def _get_description(file_name: str) -> str:
-    """Get human-readable description of a wake word from model name."""
-    if match := _WAKE_WORD_WITH_VERSION.match(file_name):
-        # Remove version
-        file_name = match.group(1)
-
-    return file_name.replace("_", " ")
-
-
-def _get_version(file_name: str) -> Optional[str]:
-    """Get version of a wake word from model name."""
-    if match := _WAKE_WORD_WITH_VERSION.match(file_name):
-        # Extract version
-        return match.group(2)
-
-    return None
+def _get_phrase(name: str) -> str:
+    phrase = name.lower().strip().replace("_", " ")
+    phrase = " ".join(w.capitalize() for w in phrase.split())
+    return phrase

@@ -1,9 +1,7 @@
 """Wyoming server for openWakeWord"""
-from pathlib import Path
 
-_DIR = Path(__file__).parent
-_VERSION_PATH = _DIR / "VERSION"
+import importlib.metadata
 
-__version__ = _VERSION_PATH.read_text(encoding="utf-8").strip()
+__version__ = importlib.metadata.version("wyoming_openwakeword")
 
 __all__ = ["__version__"]

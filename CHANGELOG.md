@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.0.0
+
+- Use [pyopen-wakeword](https://github.com/rhasspy/pyopen-wakeword/)
+- Remove `--models-dir`
+- Remove `--preload-model`
+- Remove `--output-dir`
+- Remove `--debug-probability`
+- Add `--refractory-seconds`
+- Add `--zeroconf`
+
 ## 1.10.1
 
 - Handle auto-filled audio
