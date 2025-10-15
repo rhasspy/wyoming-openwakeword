@@ -32,6 +32,9 @@ dependencies = [
 [project.urls]
 "Source Code" = "http://github.com/rhasspy/wyoming-openwakeword"
 
+[project.scripts]
+wyoming-openwakeword = "wyoming_openwakeword.__main__:run"
+
 [tool.setuptools]
 platforms = ["any"]
 zip-safe  = false
