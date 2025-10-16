@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Add `wyoming-openwakeword` script (@mweinelt)
+
 ## 2.0.0
 
 - Use [pyopen-wakeword](https://github.com/rhasspy/pyopen-wakeword/)
