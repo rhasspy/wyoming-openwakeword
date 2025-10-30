@@ -2,7 +2,7 @@
 
 ## 2.1.0
 
-- Bump to pyopen-wakeword 2.1.0 (fix memory leak)
+- Bump to pyopen-wakeword 1.1.0 (fix memory leak)
 - Add `wyoming-openwakeword` script (@mweinelt)
 
 ## 2.0.0

@@ -25,7 +25,7 @@ classifiers = [
 ]
 requires-python = ">=3.9.0"
 dependencies = [
-    "pyopen-wakeword>=1,<2",
+    "pyopen-wakeword>=1.1.0,<2",
     "wyoming>=1.8,<2",
 ]
 
